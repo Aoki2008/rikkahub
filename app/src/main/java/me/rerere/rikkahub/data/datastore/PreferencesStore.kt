@@ -38,6 +38,8 @@ import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.ChatGroup
+import me.rerere.rikkahub.data.model.DEFAULT_CHAT_COMPLETION_PRESET
+import me.rerere.rikkahub.data.model.DEFAULT_PROMPT_PRESET_ID
 import me.rerere.rikkahub.data.model.PromptPreset
 import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
@@ -292,10 +294,17 @@ class SettingsStore(
                     ttsProviders.add(defaultTTSProvider.copyProvider())
                 }
             }
+            // 始终提供内置默认 Chat Completion 预设（开箱即用 Prompt Manager）
+            val promptPresets = it.promptPresets.toMutableList().also { list ->
+                if (list.none { p -> p.id == DEFAULT_PROMPT_PRESET_ID }) {
+                    list.add(0, DEFAULT_CHAT_COMPLETION_PRESET)
+                }
+            }
             it.copy(
                 providers = providers,
                 assistants = assistants,
                 ttsProviders = ttsProviders,
+                promptPresets = promptPresets,
             )
         }
         .map { settings ->

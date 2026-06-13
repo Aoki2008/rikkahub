@@ -91,3 +91,52 @@ object PromptMarkers {
     const val DIALOGUE_EXAMPLES = "dialogueExamples"
     const val CHAT_HISTORY = "chatHistory"
 }
+
+/** 内置默认预设的固定 ID（与 SillyTavern 默认 Chat Completion 预设对齐）。 */
+val DEFAULT_PROMPT_PRESET_ID: Uuid = Uuid.parse("f1e2d3c4-b5a6-4789-9abc-def012345678")
+
+/**
+ * 内置默认 Chat Completion 预设，移植自 SillyTavern 的 openai/Default.json。
+ *
+ * 让助手开箱即用 Prompt Manager 组装（角色卡字段/世界书/人设/聊天记录各就各位），
+ * 而不是把所有内容拍扁进单个 systemPrompt。
+ */
+val DEFAULT_CHAT_COMPLETION_PRESET: PromptPreset = PromptPreset(
+    id = DEFAULT_PROMPT_PRESET_ID,
+    name = "Default (SillyTavern)",
+    prompts = listOf(
+        PresetPrompt(
+            identifier = PromptMarkers.MAIN,
+            name = "Main Prompt",
+            role = "system",
+            systemPrompt = true,
+            content = "Write {{char}}'s next reply in a fictional chat between {{char}} and {{user}}.",
+        ),
+        PresetPrompt(identifier = PromptMarkers.NSFW, name = "Auxiliary Prompt", role = "system", systemPrompt = true),
+        PresetPrompt(identifier = PromptMarkers.DIALOGUE_EXAMPLES, name = "Chat Examples", marker = true),
+        PresetPrompt(identifier = PromptMarkers.JAILBREAK, name = "Post-History Instructions", role = "system", systemPrompt = true),
+        PresetPrompt(identifier = PromptMarkers.CHAT_HISTORY, name = "Chat History", marker = true),
+        PresetPrompt(identifier = PromptMarkers.WORLD_INFO_AFTER, name = "World Info (after)", marker = true),
+        PresetPrompt(identifier = PromptMarkers.WORLD_INFO_BEFORE, name = "World Info (before)", marker = true),
+        PresetPrompt(identifier = PromptMarkers.ENHANCE_DEFINITIONS, name = "Enhance Definitions", role = "system", systemPrompt = true),
+        PresetPrompt(identifier = PromptMarkers.CHAR_DESCRIPTION, name = "Char Description", marker = true),
+        PresetPrompt(identifier = PromptMarkers.CHAR_PERSONALITY, name = "Char Personality", marker = true),
+        PresetPrompt(identifier = PromptMarkers.SCENARIO, name = "Scenario", marker = true),
+        PresetPrompt(identifier = PromptMarkers.PERSONA_DESCRIPTION, name = "Persona Description", marker = true),
+    ),
+    promptOrder = listOf(
+        PromptOrderEntry(PromptMarkers.MAIN, true),
+        PromptOrderEntry(PromptMarkers.WORLD_INFO_BEFORE, true),
+        PromptOrderEntry(PromptMarkers.CHAR_DESCRIPTION, true),
+        PromptOrderEntry(PromptMarkers.CHAR_PERSONALITY, true),
+        PromptOrderEntry(PromptMarkers.SCENARIO, true),
+        PromptOrderEntry(PromptMarkers.ENHANCE_DEFINITIONS, false),
+        PromptOrderEntry(PromptMarkers.NSFW, true),
+        PromptOrderEntry(PromptMarkers.WORLD_INFO_AFTER, true),
+        PromptOrderEntry(PromptMarkers.DIALOGUE_EXAMPLES, true),
+        PromptOrderEntry(PromptMarkers.CHAT_HISTORY, true),
+        PromptOrderEntry(PromptMarkers.JAILBREAK, true),
+    ),
+    newChatPrompt = "[Start a new Chat]",
+    newExampleChatPrompt = "[Example Chat]",
+)

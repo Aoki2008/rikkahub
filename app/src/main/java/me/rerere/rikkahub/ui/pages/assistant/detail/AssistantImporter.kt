@@ -42,6 +42,7 @@ import me.rerere.ai.ui.UIMessage
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.CharacterCard
+import me.rerere.rikkahub.data.model.DEFAULT_PROMPT_PRESET_ID
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.PromptInjection
@@ -260,6 +261,9 @@ private fun parseTavernCard(
         systemPrompt = systemPrompt,
         background = background,
         lorebookIds = lorebook?.let { setOf(it.id) } ?: emptySet(),
+        // 绑定内置默认预设，使角色卡字段经 Prompt Manager 的 marker 正确组装，
+        // 而非拍扁进单个 systemPrompt
+        promptPresetId = DEFAULT_PROMPT_PRESET_ID,
         characterCard = CharacterCard(
             description = description.orEmpty(),
             personality = personality.orEmpty(),
