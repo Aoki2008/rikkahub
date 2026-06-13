@@ -22,6 +22,8 @@ object PromptInjectionTransformer : InputMessageTransformer {
         ctx: TransformerContext,
         messages: List<UIMessage>,
     ): List<UIMessage> {
+        // 绑定了 Chat Completion 预设时，世界书由 PromptManagerTransformer 处理，跳过避免重复注入
+        if (ctx.assistant.promptPresetId != null) return messages
         return transformMessages(
             messages = messages,
             assistant = ctx.assistant,

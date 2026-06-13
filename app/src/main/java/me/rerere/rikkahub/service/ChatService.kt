@@ -63,6 +63,7 @@ import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.DocumentAsPromptTransformer
 import me.rerere.rikkahub.data.ai.transformers.OcrTransformer
 import me.rerere.rikkahub.data.ai.transformers.PersonaTransformer
+import me.rerere.rikkahub.data.ai.transformers.PromptManagerTransformer
 import me.rerere.rikkahub.data.ai.transformers.AuthorsNoteTransformer
 import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.ai.transformers.PromptInjectionTransformer
@@ -123,6 +124,7 @@ enum class ChatErrorSolution {
 private val inputTransformers by lazy {
     listOf(
         TimeReminderTransformer,
+        PromptManagerTransformer,
         PromptInjectionTransformer,
         PersonaTransformer,
         AuthorsNoteTransformer,

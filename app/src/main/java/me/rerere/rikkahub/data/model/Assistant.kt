@@ -47,6 +47,7 @@ data class Assistant(
     val allowConversationPromptInjection: Boolean = false, // 允许对话单独绑定提示词注入
     val characterCard: CharacterCard? = null, // 导入的 SillyTavern 角色卡原始字段(用于宏与重建提示词)
     val authorsNote: AuthorsNote = AuthorsNote(), // 作者注释(深度注入)
+    val promptPresetId: Uuid? = null, // 绑定的 Chat Completion 预设(酒馆预设); 非空时用 Prompt Manager 组装
 )
 
 /**

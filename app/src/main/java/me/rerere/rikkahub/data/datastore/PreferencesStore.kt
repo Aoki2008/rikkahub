@@ -38,6 +38,7 @@ import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.ChatGroup
+import me.rerere.rikkahub.data.model.PromptPreset
 import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
@@ -147,6 +148,7 @@ class SettingsStore(
         val PERSONAS = stringPreferencesKey("personas")
         val SELECTED_PERSONA = stringPreferencesKey("selected_persona")
         val CHAT_GROUPS = stringPreferencesKey("chat_groups")
+        val PROMPT_PRESETS = stringPreferencesKey("prompt_presets")
 
         // 备份提醒
         val BACKUP_REMINDER_CONFIG = stringPreferencesKey("backup_reminder_config")
@@ -244,6 +246,9 @@ class SettingsStore(
                 } ?: emptyList(),
                 selectedPersonaId = preferences[SELECTED_PERSONA]?.let { Uuid.parse(it) },
                 chatGroups = preferences[CHAT_GROUPS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
+                promptPresets = preferences[PROMPT_PRESETS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
                 webServerEnabled = preferences[WEB_SERVER_ENABLED] == true,
@@ -351,6 +356,7 @@ class SettingsStore(
                 selectedPersonaId = settings.selectedPersonaId
                     ?.takeIf { id -> settings.personas.any { it.id == id } },
                 chatGroups = settings.chatGroups.distinctBy { it.id },
+                promptPresets = settings.promptPresets.distinctBy { it.id },
             )
         }
         .onEach {
@@ -422,6 +428,7 @@ class SettingsStore(
             preferences[QUICK_MESSAGES] = JsonInstant.encodeToString(settings.quickMessages)
             preferences[PERSONAS] = JsonInstant.encodeToString(settings.personas)
             preferences[CHAT_GROUPS] = JsonInstant.encodeToString(settings.chatGroups)
+            preferences[PROMPT_PRESETS] = JsonInstant.encodeToString(settings.promptPresets)
             settings.selectedPersonaId?.let {
                 preferences[SELECTED_PERSONA] = it.toString()
             } ?: preferences.remove(SELECTED_PERSONA)
@@ -558,6 +565,7 @@ data class Settings(
     val personas: List<Persona> = emptyList(),
     val selectedPersonaId: Uuid? = null,
     val chatGroups: List<ChatGroup> = emptyList(),
+    val promptPresets: List<PromptPreset> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
     val webServerJwtEnabled: Boolean = false,

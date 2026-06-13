@@ -17,6 +17,8 @@ object PersonaTransformer : InputMessageTransformer {
         ctx: TransformerContext,
         messages: List<UIMessage>,
     ): List<UIMessage> {
+        // 绑定了预设时，人设由 PromptManagerTransformer 的 personaDescription marker 处理，跳过
+        if (ctx.assistant.promptPresetId != null) return messages
         val selectedId = ctx.settings.selectedPersonaId ?: return messages
         val persona = ctx.settings.personas.firstOrNull { it.id == selectedId } ?: return messages
         if (!persona.enabled || persona.description.isBlank()) return messages

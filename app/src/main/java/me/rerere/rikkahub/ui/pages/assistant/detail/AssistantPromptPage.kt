@@ -206,6 +206,12 @@ private fun AssistantPromptContent(
             onUpdate = { onUpdate(assistant.copy(authorsNote = it)) },
         )
 
+        PromptPresetCard(
+            assistant = assistant,
+            settings = settings,
+            onUpdate = onUpdate,
+        )
+
         CharacterCardExportButton(
             assistant = assistant,
             lorebooks = settings.lorebooks,
