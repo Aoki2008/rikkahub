@@ -84,7 +84,9 @@ jobs:
             --tests "me.rerere.rikkahub.data.model.GroupActivationTest" \
             --tests "me.rerere.rikkahub.data.model.InitialMessageNodesTest" \
             --tests "me.rerere.rikkahub.data.export.CharacterCardExporterTest" \
-            --tests "me.rerere.rikkahub.utils.PngTextChunkTest"
+            --tests "me.rerere.rikkahub.utils.PngTextChunkTest" \
+            --tests "me.rerere.rikkahub.data.ai.PromptManagerAssemblerTest" \
+            --tests "me.rerere.rikkahub.data.model.PromptPresetParserTest"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
