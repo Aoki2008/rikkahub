@@ -392,11 +392,14 @@ class GenerationHandler(
         )
 
         var messages: List<UIMessage> = messages
+        // 绑定 Chat Completion 预设时，采样参数优先用预设的值
+        val boundPreset = assistant.promptPresetId
+            ?.let { id -> settings.promptPresets.firstOrNull { it.id == id } }
         val params = TextGenerationParams(
             model = model,
-            temperature = assistant.temperature,
-            topP = assistant.topP,
-            maxTokens = assistant.maxTokens,
+            temperature = boundPreset?.temperature ?: assistant.temperature,
+            topP = boundPreset?.topP ?: assistant.topP,
+            maxTokens = boundPreset?.maxTokens ?: assistant.maxTokens,
             tools = tools,
             reasoningLevel = assistant.reasoningLevel,
             customHeaders = buildList {
