@@ -237,7 +237,7 @@ internal fun expandParametricMacros(input: String): String {
     result = Regex("""\{\{newline}}""", RegexOption.IGNORE_CASE).replace(result, "\n")
 
     // {{random:...}} 与 {{pick:...}}
-    result = Regex("""\{\{(random|pick)[:](.*?)}}""", RegexOption.IGNORE_CASE).replace(result) { match ->
+    result = Regex("""\{\{(random|pick):+(.*?)}}""", RegexOption.IGNORE_CASE).replace(result) { match ->
         val raw = match.groupValues[2]
         val options = if (raw.contains("::")) {
             raw.split("::")

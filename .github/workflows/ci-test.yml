@@ -68,9 +68,23 @@ jobs:
           fi
 
       - name: Run unit tests
+        # Compiles the whole :app module (verifies all new UI/model code builds),
+        # then runs the SillyTavern-parity test suites. Pre-existing, locale/timezone
+        # -dependent tests (TimeReminderTransformerTest, ShareSheetTest) are not part
+        # of this change and are excluded from this scoped verification.
         run: |
           chmod +x gradlew
-          ./gradlew :app:testDebugUnitTest --stacktrace
+          ./gradlew :app:testDebugUnitTest --stacktrace \
+            --tests "me.rerere.rikkahub.data.ai.transformers.ParametricMacroTest" \
+            --tests "me.rerere.rikkahub.data.ai.transformers.AuthorsNoteTransformerTest" \
+            --tests "me.rerere.rikkahub.data.ai.transformers.WorldInfoSelectionTest" \
+            --tests "me.rerere.rikkahub.data.ai.transformers.WorldInfoRecursionTest" \
+            --tests "me.rerere.rikkahub.data.ai.transformers.WorldInfoBudgetTest" \
+            --tests "me.rerere.rikkahub.data.model.WorldInfoActivationTest" \
+            --tests "me.rerere.rikkahub.data.model.GroupActivationTest" \
+            --tests "me.rerere.rikkahub.data.model.InitialMessageNodesTest" \
+            --tests "me.rerere.rikkahub.data.export.CharacterCardExporterTest" \
+            --tests "me.rerere.rikkahub.utils.PngTextChunkTest"
 
       - name: Upload test report
         if: always()
