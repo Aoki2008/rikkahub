@@ -27,6 +27,22 @@ jobs:
       - name: Install Android platform 37 (best effort)
         run: yes | sdkmanager "platforms;android-37" "build-tools;35.0.0" || true
 
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+          cache-dependency-path: web-ui/pnpm-lock.yaml
+
+      - name: Install web-ui dependencies
+        working-directory: web-ui
+        run: pnpm install --frozen-lockfile
+
       - name: Gradle cache
         uses: actions/cache@v4
         with:
