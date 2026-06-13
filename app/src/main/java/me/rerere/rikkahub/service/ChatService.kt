@@ -62,6 +62,8 @@ import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.ai.transformers.Base64ImageToLocalFileTransformer
 import me.rerere.rikkahub.data.ai.transformers.DocumentAsPromptTransformer
 import me.rerere.rikkahub.data.ai.transformers.OcrTransformer
+import me.rerere.rikkahub.data.ai.transformers.PersonaTransformer
+import me.rerere.rikkahub.data.ai.transformers.AuthorsNoteTransformer
 import me.rerere.rikkahub.data.ai.transformers.PlaceholderTransformer
 import me.rerere.rikkahub.data.ai.transformers.PromptInjectionTransformer
 import me.rerere.rikkahub.data.ai.transformers.RegexOutputTransformer
@@ -80,6 +82,7 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.data.model.toMessageNode
+import me.rerere.rikkahub.data.model.buildInitialMessageNodes
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.web.BadRequestException
@@ -121,6 +124,8 @@ private val inputTransformers by lazy {
     listOf(
         TimeReminderTransformer,
         PromptInjectionTransformer,
+        PersonaTransformer,
+        AuthorsNoteTransformer,
         PlaceholderTransformer,
         DocumentAsPromptTransformer,
         OcrTransformer,
@@ -299,14 +304,18 @@ class ChatService(
             updateConversation(conversationId, conversation)
             settingsStore.updateAssistant(conversation.assistantId)
         } else {
-            // 新建对话, 并添加预设消息
+            // 新建对话, 并添加预设消息（含备选问候语 swipe）
             val currentSettings = settingsStore.settingsFlowRaw.first()
             val assistant = currentSettings.getCurrentAssistant()
             val newConversation = Conversation.ofId(
                 id = conversationId,
                 assistantId = assistant.id,
+                messages = buildInitialMessageNodes(
+                    presetMessages = assistant.presetMessages,
+                    alternateGreetings = assistant.characterCard?.alternateGreetings ?: emptyList(),
+                ),
                 newConversation = true
-            ).updateCurrentMessages(assistant.presetMessages)
+            )
             updateConversation(conversationId, newConversation)
         }
     }

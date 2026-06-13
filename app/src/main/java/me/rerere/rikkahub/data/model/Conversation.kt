@@ -133,6 +133,34 @@ fun UIMessage.toMessageNode(): MessageNode {
 }
 
 /**
+ * 构建新对话的初始消息节点。
+ *
+ * 对应 SillyTavern 的"备选问候语"：第一条 ASSISTANT 预设消息（问候语）会与
+ * alternateGreetings 合并到同一个 [MessageNode] 中，使其可像普通消息一样左右滑动切换。
+ * selectIndex 默认为 0（即原始 first_mes）。
+ */
+fun buildInitialMessageNodes(
+    presetMessages: List<UIMessage>,
+    alternateGreetings: List<String>,
+): List<MessageNode> {
+    var greetingExpanded = false
+    return presetMessages.map { message ->
+        if (!greetingExpanded &&
+            message.role == MessageRole.ASSISTANT &&
+            alternateGreetings.isNotEmpty()
+        ) {
+            greetingExpanded = true
+            MessageNode(
+                messages = listOf(message) + alternateGreetings.map { UIMessage.assistant(it) },
+                selectIndex = 0,
+            )
+        } else {
+            message.toMessageNode()
+        }
+    }
+}
+
+/**
  * 递归展开所有 parts，包括工具调用结果中的嵌套 parts。
  */
 private fun List<UIMessagePart>.collectAllParts(): List<UIMessagePart> =

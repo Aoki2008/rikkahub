@@ -37,6 +37,8 @@ import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.ChatGroup
+import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
 import me.rerere.rikkahub.data.model.Tag
@@ -141,6 +143,11 @@ class SettingsStore(
         val LOREBOOKS = stringPreferencesKey("lorebooks")
         val QUICK_MESSAGES = stringPreferencesKey("quick_messages")
 
+        // 用户角色 (Persona)
+        val PERSONAS = stringPreferencesKey("personas")
+        val SELECTED_PERSONA = stringPreferencesKey("selected_persona")
+        val CHAT_GROUPS = stringPreferencesKey("chat_groups")
+
         // 备份提醒
         val BACKUP_REMINDER_CONFIG = stringPreferencesKey("backup_reminder_config")
 
@@ -230,6 +237,13 @@ class SettingsStore(
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
                 quickMessages = preferences[QUICK_MESSAGES]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
+                personas = preferences[PERSONAS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
+                selectedPersonaId = preferences[SELECTED_PERSONA]?.let { Uuid.parse(it) },
+                chatGroups = preferences[CHAT_GROUPS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
                 webServerEnabled = preferences[WEB_SERVER_ENABLED] == true,
@@ -333,6 +347,10 @@ class SettingsStore(
                 modeInjections = settings.modeInjections.distinctBy { it.id },
                 lorebooks = settings.lorebooks.distinctBy { it.id },
                 quickMessages = settings.quickMessages.distinctBy { it.id },
+                personas = settings.personas.distinctBy { it.id },
+                selectedPersonaId = settings.selectedPersonaId
+                    ?.takeIf { id -> settings.personas.any { it.id == id } },
+                chatGroups = settings.chatGroups.distinctBy { it.id },
             )
         }
         .onEach {
@@ -402,6 +420,11 @@ class SettingsStore(
             preferences[MODE_INJECTIONS] = JsonInstant.encodeToString(settings.modeInjections)
             preferences[LOREBOOKS] = JsonInstant.encodeToString(settings.lorebooks)
             preferences[QUICK_MESSAGES] = JsonInstant.encodeToString(settings.quickMessages)
+            preferences[PERSONAS] = JsonInstant.encodeToString(settings.personas)
+            preferences[CHAT_GROUPS] = JsonInstant.encodeToString(settings.chatGroups)
+            settings.selectedPersonaId?.let {
+                preferences[SELECTED_PERSONA] = it.toString()
+            } ?: preferences.remove(SELECTED_PERSONA)
             preferences[WEB_SERVER_ENABLED] = settings.webServerEnabled
             preferences[WEB_SERVER_PORT] = settings.webServerPort
             preferences[WEB_SERVER_JWT_ENABLED] = settings.webServerJwtEnabled
@@ -532,6 +555,9 @@ data class Settings(
     val modeInjections: List<PromptInjection.ModeInjection> = DEFAULT_MODE_INJECTIONS,
     val lorebooks: List<Lorebook> = emptyList(),
     val quickMessages: List<QuickMessage> = emptyList(),
+    val personas: List<Persona> = emptyList(),
+    val selectedPersonaId: Uuid? = null,
+    val chatGroups: List<ChatGroup> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
     val webServerJwtEnabled: Boolean = false,

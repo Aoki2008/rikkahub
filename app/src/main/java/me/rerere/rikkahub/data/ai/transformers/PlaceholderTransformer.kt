@@ -31,6 +31,20 @@ data class PlaceholderCtx(
     val assistant: Assistant,
 )
 
+/** 当前选中的用户角色 (Persona)，未选中时为 null。 */
+private fun PlaceholderCtx.activePersona(): me.rerere.rikkahub.data.model.Persona? {
+    val settings = settingsStore.settingsFlow.value
+    val id = settings.selectedPersonaId ?: return null
+    return settings.personas.firstOrNull { it.id == id }
+}
+
+/** {{user}}/{{nickname}} 解析：优先使用选中 Persona 名称，回退到全局昵称。 */
+private fun PlaceholderCtx.activeUserName(): String {
+    val personaName = activePersona()?.name?.ifBlank { null }
+    if (personaName != null) return personaName
+    return settingsStore.settingsFlow.value.displaySetting.userNickname.ifBlank { "user" }
+}
+
 interface PlaceholderProvider {
     val placeholders: Map<String, PlaceholderInfo>
 }
@@ -101,7 +115,7 @@ object DefaultPlaceholderProvider : PlaceholderProvider {
         }
 
         placeholder("nickname", { Text(stringResource(R.string.placeholder_nickname)) }) {
-            it.settingsStore.settingsFlow.value.displaySetting.userNickname.ifBlank { "user" }
+            it.activeUserName()
         }
 
         placeholder("char", { Text(stringResource(R.string.placeholder_char)) }) {
@@ -109,7 +123,25 @@ object DefaultPlaceholderProvider : PlaceholderProvider {
         }
 
         placeholder("user", { Text(stringResource(R.string.placeholder_user)) }) {
-            it.settingsStore.settingsFlow.value.displaySetting.userNickname.ifBlank { "user" }
+            it.activeUserName()
+        }
+
+        // SillyTavern 用户角色描述宏
+        placeholder("persona", { Text("Persona Description") }) {
+            it.activePersona()?.description.orEmpty()
+        }
+
+        // SillyTavern 角色卡字段宏：来自导入的 characterCard
+        placeholder("description", { Text("Character Description") }) {
+            it.assistant.characterCard?.description.orEmpty()
+        }
+
+        placeholder("personality", { Text("Character Personality") }) {
+            it.assistant.characterCard?.personality.orEmpty()
+        }
+
+        placeholder("scenario", { Text("Scenario") }) {
+            it.assistant.characterCard?.scenario.orEmpty()
         }
     }
 
@@ -177,6 +209,63 @@ object PlaceholderTransformer : InputMessageTransformer, KoinComponent {
                 .replace(oldValue = "{$key}", newValue = value, ignoreCase = true)
         }
 
+        // SillyTavern 参数化宏：{{random:..}} {{pick:..}} {{roll:..}} {{newline}} 以及注释
+        result = expandParametricMacros(result)
+
         return result
+    }
+}
+
+/**
+ * 展开 SillyTavern 风格的参数化宏（纯函数，便于单元测试）。
+ *
+ * 支持：
+ * - `{{newline}}` → 换行符
+ * - `{{// 注释}}` / `{{comment ...}}` → 移除
+ * - `{{random:a,b,c}}` 或 `{{random::a::b}}` → 随机选择其一
+ * - `{{pick:a,b,c}}` → 随机选择其一（与 random 行为一致）
+ * - `{{roll:NdM}}` / `{{roll:N}}` / `{{roll:dM}}` → 掷骰求和
+ */
+internal fun expandParametricMacros(input: String): String {
+    var result = input
+
+    // 注释：{{// ...}} 与 {{comment ...}}
+    result = Regex("""\{\{//[\s\S]*?}}""").replace(result, "")
+    result = Regex("""\{\{comment[\s\S]*?}}""", RegexOption.IGNORE_CASE).replace(result, "")
+
+    // {{newline}}
+    result = Regex("""\{\{newline}}""", RegexOption.IGNORE_CASE).replace(result, "\n")
+
+    // {{random:...}} 与 {{pick:...}}
+    result = Regex("""\{\{(random|pick)[:](.*?)}}""", RegexOption.IGNORE_CASE).replace(result) { match ->
+        val raw = match.groupValues[2]
+        val options = if (raw.contains("::")) {
+            raw.split("::")
+        } else {
+            raw.split(",")
+        }.map { it.trim() }.filter { it.isNotEmpty() }
+        if (options.isEmpty()) "" else options.random()
+    }
+
+    // {{roll:NdM}} / {{roll:N}} / {{roll:dM}}
+    result = Regex("""\{\{roll[:](.*?)}}""", RegexOption.IGNORE_CASE).replace(result) { match ->
+        rollDice(match.groupValues[1].trim()).toString()
+    }
+
+    return result
+}
+
+private fun rollDice(spec: String): Int {
+    val cleaned = spec.removePrefix("d").let { if (spec.startsWith("d", ignoreCase = true)) "1d$it" else spec }
+    val parts = cleaned.split(Regex("d", RegexOption.IGNORE_CASE))
+    return when (parts.size) {
+        1 -> parts[0].toIntOrNull()?.let { (1..it.coerceAtLeast(1)).random() } ?: 0
+        2 -> {
+            val count = parts[0].toIntOrNull()?.coerceIn(1, 100) ?: 1
+            val sides = parts[1].toIntOrNull()?.coerceAtLeast(1) ?: 6
+            (1..count).sumOf { (1..sides).random() }
+        }
+
+        else -> 0
     }
 }

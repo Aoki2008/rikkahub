@@ -9,6 +9,7 @@ import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.extractContextForMatching
 import me.rerere.rikkahub.data.model.isTriggered
+import kotlin.random.Random
 import kotlin.uuid.Uuid
 
 /**
@@ -68,6 +69,9 @@ internal fun transformMessages(
 
 /**
  * 收集需要注入的内容
+ *
+ * @param roll 概率判定函数(传入 0~100 的概率, 返回是否命中)，默认使用真实随机数，
+ *             测试时可注入确定性实现。
  */
 internal fun collectInjections(
     messages: List<UIMessage>,
@@ -76,6 +80,7 @@ internal fun collectInjections(
     lorebooks: List<Lorebook>,
     conversationModeInjectionIds: Set<Uuid> = emptySet(),
     conversationLorebookIds: Set<Uuid> = emptySet(),
+    roll: (Int) -> Boolean = ::defaultRoll,
 ): List<PromptInjection> {
     val injections = mutableListOf<PromptInjection>()
     val effectiveModeInjectionIds = if (assistant.allowConversationPromptInjection) {
@@ -101,18 +106,118 @@ internal fun collectInjections(
     if (enabledLorebooks.isNotEmpty()) {
         // 提取上下文用于匹配（只取非 SYSTEM 消息）
         val nonSystemMessages = messages.filter { it.role != MessageRole.SYSTEM }
+        val allEntries = enabledLorebooks.flatMap { it.entries }.filter { it.enabled }
 
-        enabledLorebooks.forEach { lorebook ->
-            lorebook.entries
-                .filter { entry ->
-                    val context = extractContextForMatching(nonSystemMessages, entry.scanDepth)
-                    entry.isTriggered(context)
-                }
-                .forEach { injections.add(it) }
+        // 初始激活：按各条目 scanDepth 扫描对话；delayUntilRecursion 的条目跳过
+        val initiallyActivated = allEntries.filter { entry ->
+            if (entry.delayUntilRecursion) return@filter false
+            val context = extractContextForMatching(nonSystemMessages, entry.scanDepth)
+            entry.isTriggered(context)
         }
+
+        // 递归激活：用已激活条目的内容继续触发其他条目
+        val activated = expandRecursive(allEntries, initiallyActivated)
+
+        // 应用概率判定与包含组筛选
+        val selected = selectTriggeredEntries(activated, roll)
+
+        // 应用字符预算（取启用世界书中最大的非零预算）
+        val budget = enabledLorebooks.mapNotNull { it.tokenBudget.takeIf { b -> b > 0 } }.maxOrNull() ?: 0
+        injections.addAll(applyTokenBudget(selected, budget))
     }
 
     return injections
+}
+
+/**
+ * 字符预算筛选（纯函数，便于测试）。
+ *
+ * budget <= 0 表示不限制。否则按优先级从高到低累计内容长度，
+ * 常驻(constantActive)条目始终保留，超出预算的非常驻条目被丢弃。
+ */
+internal fun applyTokenBudget(
+    entries: List<PromptInjection.RegexInjection>,
+    budget: Int,
+): List<PromptInjection.RegexInjection> {
+    if (budget <= 0) return entries
+    // 常驻条目优先保留，其余按优先级降序竞争预算
+    val (constant, optional) = entries.partition { it.constantActive }
+    var used = constant.sumOf { it.content.length }
+    val kept = constant.toMutableList()
+    optional.sortedByDescending { it.priority }.forEach { entry ->
+        val cost = entry.content.length
+        if (used + cost <= budget) {
+            kept.add(entry)
+            used += cost
+        }
+    }
+    // 保持原有顺序
+    return entries.filter { it in kept }
+}
+
+/** 默认最大递归步数 */
+internal const val DEFAULT_MAX_RECURSION_STEPS = 3
+
+/**
+ * 世界书递归激活（纯函数，便于测试）。
+ *
+ * 用已激活条目的内容作为扫描缓冲，继续触发其他条目，直到无新增或达到步数上限：
+ * - preventRecursion 的条目内容不进入扫描缓冲（不触发其他条目）
+ * - excludeRecursion 的条目不会被递归激活（只能由对话激活）
+ * - delayUntilRecursion 的条目只能在递归阶段被激活
+ */
+internal fun expandRecursive(
+    allEntries: List<PromptInjection.RegexInjection>,
+    initiallyActivated: List<PromptInjection.RegexInjection>,
+    maxSteps: Int = DEFAULT_MAX_RECURSION_STEPS,
+): List<PromptInjection.RegexInjection> {
+    val activated = LinkedHashSet(initiallyActivated)
+    var frontier = initiallyActivated
+    var step = 0
+    while (step < maxSteps && frontier.isNotEmpty()) {
+        val buffer = frontier
+            .filterNot { it.preventRecursion }
+            .joinToString("\n") { it.content }
+        if (buffer.isBlank()) break
+        val newly = allEntries.filter { entry ->
+            entry !in activated && !entry.excludeRecursion && entry.isTriggered(buffer)
+        }
+        if (newly.isEmpty()) break
+        activated.addAll(newly)
+        frontier = newly
+        step++
+    }
+    return activated.toList()
+}
+
+/**
+ * 默认概率判定：概率 >=100 必中，<=0 必不中，否则按随机数判定。
+ */
+internal fun defaultRoll(probability: Int): Boolean = when {
+    probability >= 100 -> true
+    probability <= 0 -> false
+    else -> Random.nextInt(100) < probability
+}
+
+/**
+ * 对被触发的世界书条目应用概率判定与包含组筛选（纯函数，便于测试）。
+ *
+ * - useProbability 为 true 时按 probability 判定是否保留
+ * - 同一非空 inclusionGroup 中仅保留优先级最高的一条
+ */
+internal fun selectTriggeredEntries(
+    entries: List<PromptInjection.RegexInjection>,
+    roll: (Int) -> Boolean = ::defaultRoll,
+): List<PromptInjection.RegexInjection> {
+    val afterProbability = entries.filter { entry ->
+        if (entry.useProbability) roll(entry.probability) else true
+    }
+    val (grouped, ungrouped) = afterProbability.partition { it.inclusionGroup.isNotBlank() }
+    val groupWinners = grouped
+        .groupBy { it.inclusionGroup }
+        .values
+        .mapNotNull { group -> group.maxByOrNull { it.priority } }
+    return ungrouped + groupWinners
 }
 
 /**

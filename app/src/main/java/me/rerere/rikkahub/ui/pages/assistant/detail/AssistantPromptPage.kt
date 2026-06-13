@@ -75,6 +75,7 @@ import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.AssistantRegex
+import me.rerere.rikkahub.data.model.AuthorsNote
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.ui.components.message.ChatMessage
@@ -199,6 +200,16 @@ private fun AssistantPromptContent(
                 }
             }
         }
+
+        AuthorsNoteCard(
+            authorsNote = assistant.authorsNote,
+            onUpdate = { onUpdate(assistant.copy(authorsNote = it)) },
+        )
+
+        CharacterCardExportButton(
+            assistant = assistant,
+            lorebooks = settings.lorebooks,
+        )
 
         Card(
             colors = CustomColors.cardColorsOnSurfaceContainer
@@ -533,6 +544,73 @@ private fun AssistantPromptContent(
                 ) {
                     Icon(HugeIcons.Add01, null)
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AuthorsNoteCard(
+    authorsNote: AuthorsNote,
+    onUpdate: (AuthorsNote) -> Unit,
+) {
+    Card(
+        colors = CustomColors.cardColorsOnSurfaceContainer
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = "Author's Note",
+                    style = MaterialTheme.typography.titleSmall,
+                    modifier = Modifier.weight(1f),
+                )
+                Switch(
+                    checked = authorsNote.enabled,
+                    onCheckedChange = { onUpdate(authorsNote.copy(enabled = it)) },
+                )
+            }
+            Text(
+                text = "Injected into chat history at a fixed depth to steer style/plot. Supports macros.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            OutlinedTextField(
+                value = authorsNote.content,
+                onValueChange = { onUpdate(authorsNote.copy(content = it)) },
+                label = { Text("Note content") },
+                minLines = 2,
+                enabled = authorsNote.enabled,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = authorsNote.injectDepth.toString(),
+                    onValueChange = { v ->
+                        v.toIntOrNull()?.let { onUpdate(authorsNote.copy(injectDepth = it.coerceAtLeast(0))) }
+                    },
+                    label = { Text("Depth") },
+                    singleLine = true,
+                    enabled = authorsNote.enabled,
+                    modifier = Modifier.weight(1f),
+                )
+                OutlinedTextField(
+                    value = authorsNote.interval.toString(),
+                    onValueChange = { v ->
+                        v.toIntOrNull()?.let { onUpdate(authorsNote.copy(interval = it.coerceAtLeast(1))) }
+                    },
+                    label = { Text("Every N msgs") },
+                    singleLine = true,
+                    enabled = authorsNote.enabled,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }

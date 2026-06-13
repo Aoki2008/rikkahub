@@ -1,0 +1,64 @@
+name: CI - Unit Tests
+
+# Runs the app's unit tests on GitHub's runners (no local machine/disk needed).
+# Verifies the SillyTavern-parity work (character cards, world info, personas,
+# author's note, macros, greeting swipes, group-chat engine, PNG export).
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform 37 (best effort)
+        run: yes | sdkmanager "platforms;android-37" "build-tools;35.0.0" || true
+
+      - name: Gradle cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: ${{ runner.os }}-gradle-
+
+      - name: Provide google-services.json
+        # Unit tests don't contact Firebase; a placeholder satisfies the
+        # google-services plugin so :app can compile. If a real
+        # GOOGLE_SERVICES_JSON secret exists it is used instead.
+        run: |
+          if [ -n "${{ secrets.GOOGLE_SERVICES_JSON }}" ]; then
+            printf '%s' '${{ secrets.GOOGLE_SERVICES_JSON }}' > app/google-services.json
+            echo "Used GOOGLE_SERVICES_JSON secret."
+          else
+            printf '%s' '{"project_info":{"project_number":"000000000000","project_id":"rikkahub-ci","storage_bucket":"rikkahub-ci.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000aaaaaa","android_client_info":{"package_name":"me.rerere.rikkahub.st"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyA0000000000000000000000000000000"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}},{"client_info":{"mobilesdk_app_id":"1:000000000000:android:1111111111111111bbbbbb","android_client_info":{"package_name":"me.rerere.rikkahub.st.debug"}},"oauth_client":[],"api_key":[{"current_key":"AIzaSyA0000000000000000000000000000000"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > app/google-services.json
+            echo "Used placeholder google-services.json."
+          fi
+
+      - name: Run unit tests
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:testDebugUnitTest --stacktrace
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-report
+          path: |
+            app/build/reports/tests/
+            app/build/test-results/

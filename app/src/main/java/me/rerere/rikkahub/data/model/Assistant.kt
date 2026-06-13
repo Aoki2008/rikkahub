@@ -45,6 +45,45 @@ data class Assistant(
     val enableTimeReminder: Boolean = false,            // 时间间隔提醒注入
     val allowConversationSystemPrompt: Boolean = false, // 允许对话单独重写 system prompt
     val allowConversationPromptInjection: Boolean = false, // 允许对话单独绑定提示词注入
+    val characterCard: CharacterCard? = null, // 导入的 SillyTavern 角色卡原始字段(用于宏与重建提示词)
+    val authorsNote: AuthorsNote = AuthorsNote(), // 作者注释(深度注入)
+)
+
+/**
+ * 作者注释 (Author's Note)
+ *
+ * 对应 SillyTavern 的 Author's Note：一段按配置深度注入到对话历史中的文本，
+ * 通常用于稳定地引导风格/剧情走向。支持插入频率(interval)。
+ */
+@Serializable
+data class AuthorsNote(
+    val enabled: Boolean = false,
+    val content: String = "",
+    val position: InjectionPosition = InjectionPosition.AT_DEPTH,
+    val injectDepth: Int = 4,
+    val role: MessageRole = MessageRole.USER,
+    val interval: Int = 1, // 每隔 N 条消息插入一次(1 = 每次都插入)
+)
+
+/**
+ * SillyTavern 角色卡原始字段 (V2/V3 spec)
+ *
+ * 保留导入时的原始字段，使 {{description}}/{{personality}}/{{scenario}} 等宏可用，
+ * 并支持将来基于上下文模板重建提示词、备选问候语切换等功能。
+ */
+@Serializable
+data class CharacterCard(
+    val description: String = "",
+    val personality: String = "",
+    val scenario: String = "",
+    val mesExample: String = "",
+    val creatorNotes: String = "",
+    val creator: String = "",
+    val characterVersion: String = "",
+    val tags: List<String> = emptyList(),
+    val firstMessage: String = "",
+    val alternateGreetings: List<String> = emptyList(),
+    val postHistoryInstructions: String = "",
 )
 
 @Serializable
@@ -126,6 +165,26 @@ enum class InjectionPosition {
 }
 
 /**
+ * 世界书条目的次要关键词逻辑 (对应 SillyTavern world_info_logic)
+ *
+ * 仅当 secondaryKeys 非空时生效；否则只看主关键词。
+ */
+@Serializable
+enum class SelectiveLogic {
+    @SerialName("and_any")
+    AND_ANY,   // 主关键词命中 且 任一次要关键词命中
+
+    @SerialName("not_all")
+    NOT_ALL,   // 主关键词命中 且 并非全部次要关键词命中
+
+    @SerialName("not_any")
+    NOT_ANY,   // 主关键词命中 且 无任何次要关键词命中
+
+    @SerialName("and_all")
+    AND_ALL,   // 主关键词命中 且 全部次要关键词命中
+}
+
+/**
  * 提示词注入
  *
  * - ModeInjection: 基于模式开关的注入（如学习模式）
@@ -177,6 +236,15 @@ sealed class PromptInjection {
         val caseSensitive: Boolean = false,        // 大小写敏感
         val scanDepth: Int = 4,                    // 扫描最近N条消息
         val constantActive: Boolean = false,       // 常驻激活（无需匹配）
+        val secondaryKeys: List<String> = emptyList(), // 次要关键词
+        val selectiveLogic: SelectiveLogic = SelectiveLogic.AND_ANY, // 次要关键词逻辑
+        val matchWholeWords: Boolean = false,      // 整词匹配
+        val probability: Int = 100,                // 触发概率(0~100)
+        val useProbability: Boolean = false,       // 是否启用概率
+        val inclusionGroup: String = "",           // 包含组：同组内仅激活一个(优先级最高者)
+        val excludeRecursion: Boolean = false,     // 不被其他条目的递归激活(仅匹配对话)
+        val preventRecursion: Boolean = false,     // 本条目内容不参与递归扫描(不触发其他条目)
+        val delayUntilRecursion: Boolean = false,  // 仅在递归阶段可被激活(初始扫描不激活)
     ) : PromptInjection()
 }
 
@@ -190,10 +258,46 @@ data class Lorebook(
     val description: String = "",
     val enabled: Boolean = true,
     val entries: List<PromptInjection.RegexInjection> = emptyList(),
+    val tokenBudget: Int = 0, // 激活条目内容的字符预算上限(0 = 不限制)
 )
 
 /**
+ * 检查单个关键词是否在上下文中出现。
+ */
+private fun keywordMatches(
+    context: String,
+    keyword: String,
+    useRegex: Boolean,
+    caseSensitive: Boolean,
+    matchWholeWords: Boolean,
+): Boolean {
+    if (keyword.isBlank()) return false
+    if (useRegex) {
+        return try {
+            val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
+            Regex(keyword, options).containsMatchIn(context)
+        } catch (e: Exception) {
+            false
+        }
+    }
+    if (matchWholeWords) {
+        return try {
+            val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
+            Regex("\\b${Regex.escape(keyword)}\\b", options).containsMatchIn(context)
+        } catch (e: Exception) {
+            context.contains(keyword, ignoreCase = !caseSensitive)
+        }
+    }
+    return context.contains(keyword, ignoreCase = !caseSensitive)
+}
+
+/**
  * 检查 RegexInjection 是否被触发
+ *
+ * 逻辑（对齐 SillyTavern）：
+ * 1. constantActive → 永远触发
+ * 2. 主关键词需至少命中其一
+ * 3. 若有次要关键词，按 selectiveLogic 进一步判定
  *
  * @param context 要扫描的上下文文本
  * @return 是否触发
@@ -203,21 +307,21 @@ fun PromptInjection.RegexInjection.isTriggered(context: String): Boolean {
     if (constantActive) return true
     if (keywords.isEmpty()) return false
 
-    return keywords.any { keyword ->
-        if (useRegex) {
-            try {
-                val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
-                Regex(keyword, options).containsMatchIn(context)
-            } catch (e: Exception) {
-                false
-            }
-        } else {
-            if (caseSensitive) {
-                context.contains(keyword)
-            } else {
-                context.contains(keyword, ignoreCase = true)
-            }
-        }
+    val primaryMatched = keywords.any {
+        keywordMatches(context, it, useRegex, caseSensitive, matchWholeWords)
+    }
+    if (!primaryMatched) return false
+
+    if (secondaryKeys.isEmpty()) return true
+
+    val matchedSecondary = secondaryKeys.filter {
+        keywordMatches(context, it, useRegex, caseSensitive, matchWholeWords)
+    }
+    return when (selectiveLogic) {
+        SelectiveLogic.AND_ANY -> matchedSecondary.isNotEmpty()
+        SelectiveLogic.AND_ALL -> matchedSecondary.size == secondaryKeys.size
+        SelectiveLogic.NOT_ANY -> matchedSecondary.isEmpty()
+        SelectiveLogic.NOT_ALL -> matchedSecondary.size < secondaryKeys.size
     }
 }
 
