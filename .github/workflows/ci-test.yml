@@ -86,6 +86,17 @@ jobs:
             --tests "me.rerere.rikkahub.data.export.CharacterCardExporterTest" \
             --tests "me.rerere.rikkahub.utils.PngTextChunkTest"
 
+      - name: Build debug APK
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Upload debug APK
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rikkahub-st-debug-apk
+          path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v4
