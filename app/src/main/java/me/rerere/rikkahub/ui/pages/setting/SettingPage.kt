@@ -51,7 +51,6 @@ import me.rerere.hugeicons.stroke.Developer
 import me.rerere.hugeicons.stroke.GlobalSearch
 import me.rerere.hugeicons.stroke.ImageUpload
 import me.rerere.hugeicons.stroke.LookTop
-import me.rerere.hugeicons.stroke.McpServer
 import me.rerere.hugeicons.stroke.Megaphone01
 import me.rerere.hugeicons.stroke.Package
 import me.rerere.hugeicons.stroke.Settings03
@@ -59,7 +58,6 @@ import me.rerere.hugeicons.stroke.Share04
 import me.rerere.hugeicons.stroke.Sun01
 import me.rerere.hugeicons.stroke.WavingHand01
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.AppLinks
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.isNotConfigured
@@ -236,14 +234,6 @@ fun SettingPage(vm: SettingVM = koinViewModel()) {
                         supportingContent = { Text(stringResource(R.string.setting_page_tts_service_desc)) },
                         headlineContent = { Text(stringResource(R.string.setting_page_tts_service)) },
                     )
-                    if (AppFeatures.MCP) {
-                        item(
-                            onClick = { navController.navigate(Screen.SettingMcp) },
-                            leadingContent = { Icon(HugeIcons.McpServer, null) },
-                            supportingContent = { Text(stringResource(R.string.setting_page_mcp_desc)) },
-                            headlineContent = { Text(stringResource(R.string.setting_page_mcp)) },
-                        )
-                    }
                 }
             }
 

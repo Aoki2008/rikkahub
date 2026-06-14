@@ -46,6 +46,9 @@ import okhttp3.Request
 private const val SILLY_TAVERN_OFFICIAL_INDEX =
     "https://raw.githubusercontent.com/SillyTavern/SillyTavern/release/default/content/index.json"
 
+private const val SILLY_TAVERN_CONTENT_MANAGER_INDEX =
+    "https://raw.githubusercontent.com/SillyTavern/SillyTavern-Content/main/index.json"
+
 data class SillyTavernResourcesUiState(
     val loading: Boolean = false,
     val importingAsset: String? = null,
@@ -131,8 +134,7 @@ class SillyTavernResourcesVM(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(loading = true) }
             try {
-                val text = downloadText(SILLY_TAVERN_OFFICIAL_INDEX)
-                val assets = parseSillyTavernContentIndex(text)
+                val assets = loadMarketAssets()
                     .sortedWith(compareBy<SillyTavernMarketAsset> { it.type }.thenBy { it.displayName })
                 _uiState.update { it.copy(assets = assets) }
                 withContext(Dispatchers.Main) {
@@ -146,6 +148,29 @@ class SillyTavernResourcesVM(
                 _uiState.update { it.copy(loading = false) }
             }
         }
+    }
+
+    private suspend fun loadMarketAssets(): List<SillyTavernMarketAsset> = coroutineScope {
+        val sources = listOf(
+            SILLY_TAVERN_OFFICIAL_INDEX,
+            SILLY_TAVERN_CONTENT_MANAGER_INDEX,
+        )
+        val attempts = sources
+            .map { url ->
+                async(Dispatchers.IO) {
+                    runCatching { parseSillyTavernContentIndex(downloadText(url)) }
+                }
+            }
+            .awaitAll()
+
+        val assets = attempts
+            .flatMap { it.getOrDefault(emptyList()) }
+            .distinctBy { "${it.type}:${it.filename}" }
+        if (assets.isEmpty()) {
+            throw attempts.firstNotNullOfOrNull { it.exceptionOrNull() }
+                ?: IllegalStateException("No SillyTavern market assets found")
+        }
+        assets
     }
 
     fun importAsset(

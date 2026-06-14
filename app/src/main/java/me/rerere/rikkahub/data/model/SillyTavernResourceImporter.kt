@@ -61,6 +61,7 @@ data class SillyTavernMarketAsset(
     val type: String,
     val displayName: String,
     val downloadUrl: String,
+    val description: String? = null,
 )
 
 data class SillyTavernSpriteFile(
@@ -232,13 +233,16 @@ private fun parseLorebookOrNull(json: JsonObject, fallbackName: String): Loreboo
 }
 
 private fun parseContentIndexAsset(json: JsonObject): SillyTavernMarketAsset? {
-    val filename = json.stringValue("filename")?.takeIf { it.isNotBlank() } ?: return null
-    val type = json.stringValue("type")?.takeIf { it.isNotBlank() } ?: return null
+    val filename = json.stringValue("filename", "id", "name")?.takeIf { it.isNotBlank() } ?: return null
+    val type = json.stringValue("type")?.trim()?.lowercase()?.takeIf { it.isNotBlank() } ?: return null
+    val explicitUrl = json.stringValue("url")?.takeIf { it.isNotBlank() }
     return SillyTavernMarketAsset(
         filename = filename,
         type = type,
-        displayName = filename.substringAfterLast('/').substringBeforeLast('.'),
-        downloadUrl = "$SILLY_TAVERN_CONTENT_BASE_URL/${filename.toUrlPath()}",
+        displayName = json.stringValue("name")
+            ?: filename.substringAfterLast('/').substringBeforeLast('.'),
+        downloadUrl = explicitUrl ?: "$SILLY_TAVERN_CONTENT_BASE_URL/${filename.toUrlPath()}",
+        description = json.stringValue("description"),
     )
 }
 
@@ -274,6 +278,7 @@ private val SillyTavernCompatibleAssetTypes = setOf(
     "regex_scripts",
     "character",
     "sprites",
+    "extension",
 )
 
 private val SillyTavernSpriteImageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif")

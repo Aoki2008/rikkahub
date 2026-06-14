@@ -270,9 +270,6 @@ dependencies {
     implementation(libs.jlatexmath.font.greek)
     implementation(libs.jlatexmath.font.cyrillic)
 
-    // mcp
-    implementation(libs.modelcontextprotocol.kotlin.sdk)
-
     // jmDNS (mDNS/Bonjour for .local hostname)
     implementation(libs.jmdns)
 

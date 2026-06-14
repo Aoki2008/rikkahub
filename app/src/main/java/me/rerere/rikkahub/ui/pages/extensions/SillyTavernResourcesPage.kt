@@ -62,6 +62,7 @@ fun SillyTavernResourcesPage(
             .filter { asset ->
                 query.isBlank() ||
                     asset.displayName.contains(query, ignoreCase = true) ||
+                    asset.description?.contains(query, ignoreCase = true) == true ||
                     asset.type.contains(query, ignoreCase = true) ||
                     asset.filename.contains(query, ignoreCase = true)
             }
@@ -207,14 +208,18 @@ fun SillyTavernResourcesPage(
                         asset = asset,
                         importing = uiState.importingAsset == asset.filename,
                         onImport = {
-                            vm.importAsset(asset) { success, message ->
-                                toaster.show(
-                                    if (success) {
-                                        context.getString(R.string.st_resources_import_success, message)
-                                    } else {
-                                        context.getString(R.string.st_resources_import_failed, message)
-                                    }
-                                )
+                            if (asset.type.equals("extension", ignoreCase = true)) {
+                                context.openUrl(asset.downloadUrl)
+                            } else {
+                                vm.importAsset(asset) { success, message ->
+                                    toaster.show(
+                                        if (success) {
+                                            context.getString(R.string.st_resources_import_success, message)
+                                        } else {
+                                            context.getString(R.string.st_resources_import_failed, message)
+                                        }
+                                    )
+                                }
                             }
                         },
                     )
@@ -373,12 +378,26 @@ private fun SillyTavernMarketAssetItem(
             onClick = if (importing) null else onImport,
             leadingContent = { Icon(HugeIcons.Puzzle, null) },
             headlineContent = { Text(asset.displayName) },
-            supportingContent = { Text(asset.type) },
+            supportingContent = {
+                Text(
+                    asset.description
+                        ?.takeIf { it.isNotBlank() }
+                        ?: asset.type,
+                )
+            },
             trailingContent = {
                 if (importing) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
-                    Text(stringResource(R.string.st_resources_import_asset))
+                    Text(
+                        stringResource(
+                            if (asset.type.equals("extension", ignoreCase = true)) {
+                                R.string.st_resources_open_asset
+                            } else {
+                                R.string.st_resources_import_asset
+                            }
+                        )
+                    )
                 }
             },
         )

@@ -80,7 +80,6 @@ import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantBasicPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantDetailPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantExtensionsPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantLocalToolPage
-import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantMcpPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantMemoryPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantPromptPage
 import me.rerere.rikkahub.ui.pages.assistant.detail.AssistantRequestPage
@@ -108,7 +107,6 @@ import me.rerere.rikkahub.ui.pages.setting.SettingPreferencesUIPage
 import me.rerere.rikkahub.ui.pages.setting.SettingThemePage
 import me.rerere.rikkahub.ui.pages.setting.SettingDonatePage
 import me.rerere.rikkahub.ui.pages.setting.SettingFilesPage
-import me.rerere.rikkahub.ui.pages.setting.SettingMcpPage
 import me.rerere.rikkahub.ui.pages.setting.SettingModelPage
 import me.rerere.rikkahub.ui.pages.setting.SettingPage
 import me.rerere.rikkahub.ui.pages.setting.SettingProviderDetailPage
@@ -355,12 +353,6 @@ class RouteActivity : ComponentActivity() {
                                 AssistantRequestPage(key.id)
                             }
 
-                            if (AppFeatures.MCP) {
-                                entry<Screen.AssistantMcp> { key ->
-                                    AssistantMcpPage(key.id)
-                                }
-                            }
-
                             entry<Screen.AssistantLocalTool> { key ->
                                 AssistantLocalToolPage(key.id)
                             }
@@ -445,12 +437,6 @@ class RouteActivity : ComponentActivity() {
 
                             entry<Screen.SettingSpeech> {
                                 SettingSpeechPage()
-                            }
-
-                            if (AppFeatures.MCP) {
-                                entry<Screen.SettingMcp> {
-                                    SettingMcpPage()
-                                }
                             }
 
                             entry<Screen.SettingDonate> {
@@ -595,9 +581,6 @@ sealed interface Screen : NavKey {
     data class AssistantRequest(val id: String) : Screen
 
     @Serializable
-    data class AssistantMcp(val id: String) : Screen
-
-    @Serializable
     data class AssistantLocalTool(val id: String) : Screen
 
     @Serializable
@@ -656,9 +639,6 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object SettingSpeech : Screen
-
-    @Serializable
-    data object SettingMcp : Screen
 
     @Serializable
     data object SettingDonate : Screen

@@ -86,6 +86,7 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import me.rerere.ai.ui.UIMessage
 import me.rerere.rikkahub.R
@@ -282,15 +283,16 @@ private fun ChatListNormal(
         // 自动滚动到底部
         if (settings.displaySetting.enableAutoScroll) {
             LaunchedEffect(state) {
-                snapshotFlow { state.layoutInfo.visibleItemsInfo }.collect { visibleItemsInfo ->
-                    // println("is bottom = ${visibleItemsInfo.isAtBottom()}, scroll = ${state.isScrollInProgress}, can_scroll = ${state.canScrollForward}, loading = $loading")
-                    if (!state.isScrollInProgress && loadingState) {
-                        if (visibleItemsInfo.isAtBottom()) {
-                            state.requestScrollToItem(conversationUpdated.messageNodes.lastIndex + 10)
-                            // Log.i(TAG, "ChatList: scroll to ${conversationUpdated.messageNodes.lastIndex}")
+                snapshotFlow { state.layoutInfo.visibleItemsInfo.isAtBottom() }
+                    .distinctUntilChanged()
+                    .collect { isAtBottom ->
+                        if (!state.isScrollInProgress && loadingState) {
+                            if (isAtBottom) {
+                                state.requestScrollToItem(conversationUpdated.messageNodes.lastIndex + 10)
+                                // Log.i(TAG, "ChatList: scroll to ${conversationUpdated.messageNodes.lastIndex}")
+                            }
                         }
                     }
-                }
             }
         }
 
@@ -317,110 +319,111 @@ private fun ChatListNormal(
                     .hazeSource(state = hazeState)
                     .padding(top = innerPadding.calculateTopPadding()),
             ) {
-            itemsIndexed(
-                items = conversation.messageNodes,
-                key = { index, item -> item.id },
-            ) { index, node ->
-                Column {
-                    ListSelectableItem(
-                        key = node.id,
-                        onSelectChange = {
-                            if (!selectedItems.contains(node.id)) {
-                                selectedItems.add(node.id)
-                            } else {
-                                selectedItems.remove(node.id)
-                            }
-                        },
-                        selectedKeys = selectedItems,
-                        enabled = selecting,
-                    ) {
-                        val senderId = node.currentMessage.senderId
-                        val memberAssistant = if (isGroupConversation && senderId != null) {
-                            assistantById[senderId] ?: assistant
-                        } else {
-                            assistant
-                        }
-                        ChatMessage(
-                            node = node,
-                            model = node.currentMessage.modelId?.let(modelById::get),
-                            assistant = memberAssistant,
-                            forceAssistantAvatar = isGroupConversation && senderId != null,
-                            loading = loading && index == lastMessageIndex,
-                            onRegenerate = {
-                                onRegenerate(node.currentMessage)
+                itemsIndexed(
+                    items = conversation.messageNodes,
+                    key = { index, item -> item.id },
+                    contentType = { _, item -> item.currentMessage.role },
+                ) { index, node ->
+                    Column {
+                        ListSelectableItem(
+                            key = node.id,
+                            onSelectChange = {
+                                if (!selectedItems.contains(node.id)) {
+                                    selectedItems.add(node.id)
+                                } else {
+                                    selectedItems.remove(node.id)
+                                }
                             },
-                            onEdit = {
-                                onEdit(node.currentMessage)
-                            },
-                            onFork = {
-                                onForkMessage(node.currentMessage)
-                            },
-                            onDelete = {
-                                onDelete(node.currentMessage)
-                            },
-                            onShare = {
-                                selecting = true  // 使用 CoroutineScope 延迟状态更新
-                                selectedItems.clear()
-                                selectedItems.addAll(conversation.messageNodes.map { it.id }
-                                    .subList(0, conversation.messageNodes.indexOf(node) + 1))
-                            },
-                            onUpdate = {
-                                onUpdateMessage(it)
-                            },
-                            isFavorite = node.isFavorite,
-                            onToggleFavorite = {
-                                onToggleFavorite?.invoke(node)
-                            },
-                            onTranslate = onTranslate,
-                            onClearTranslation = onClearTranslation,
-                            onToolApproval = onToolApproval,
-                            onToolAnswer = onToolAnswer,
-                            lastMessage = index == lastMessageIndex,
-                        )
-                    }
-                }
-            }
-
-            if (!loading && assistant?.allowConversationSystemPrompt == true && onConversationSystemPromptChange != null) {
-                item(key = "ConversationSystemPrompt") {
-                    ConversationSystemPromptButton(
-                        customSystemPrompt = conversation.customSystemPrompt,
-                        onSystemPromptChange = onConversationSystemPromptChange,
-                    )
-                }
-            }
-
-            if (loading) {
-                item(LoadingIndicatorKey) {
-                    Row(
-                        modifier = Modifier.padding(8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        RabbitLoadingIndicator(
-                            modifier = Modifier.size(28.dp)
-                        )
-                        AnimatedVisibility(
-                            visible = processingStatus != null,
+                            selectedKeys = selectedItems,
+                            enabled = selecting,
                         ) {
-                            Text(
-                                text = processingStatus ?: "",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            val senderId = node.currentMessage.senderId
+                            val memberAssistant = if (isGroupConversation && senderId != null) {
+                                assistantById[senderId] ?: assistant
+                            } else {
+                                assistant
+                            }
+                            ChatMessage(
+                                node = node,
+                                model = node.currentMessage.modelId?.let(modelById::get),
+                                assistant = memberAssistant,
+                                forceAssistantAvatar = isGroupConversation && senderId != null,
+                                loading = loading && index == lastMessageIndex,
+                                onRegenerate = {
+                                    onRegenerate(node.currentMessage)
+                                },
+                                onEdit = {
+                                    onEdit(node.currentMessage)
+                                },
+                                onFork = {
+                                    onForkMessage(node.currentMessage)
+                                },
+                                onDelete = {
+                                    onDelete(node.currentMessage)
+                                },
+                                onShare = {
+                                    selecting = true  // 使用 CoroutineScope 延迟状态更新
+                                    selectedItems.clear()
+                                    selectedItems.addAll(conversation.messageNodes.map { it.id }
+                                        .subList(0, index + 1))
+                                },
+                                onUpdate = {
+                                    onUpdateMessage(it)
+                                },
+                                isFavorite = node.isFavorite,
+                                onToggleFavorite = {
+                                    onToggleFavorite?.invoke(node)
+                                },
+                                onTranslate = onTranslate,
+                                onClearTranslation = onClearTranslation,
+                                onToolApproval = onToolApproval,
+                                onToolAnswer = onToolAnswer,
+                                lastMessage = index == lastMessageIndex,
                             )
                         }
                     }
                 }
-            }
 
-            // 为了能正确滚动到这
-            item(ScrollBottomKey) {
-                Spacer(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(5.dp)
-                )
-            }
+                if (!loading && assistant?.allowConversationSystemPrompt == true && onConversationSystemPromptChange != null) {
+                    item(key = "ConversationSystemPrompt") {
+                        ConversationSystemPromptButton(
+                            customSystemPrompt = conversation.customSystemPrompt,
+                            onSystemPromptChange = onConversationSystemPromptChange,
+                        )
+                    }
+                }
+
+                if (loading) {
+                    item(LoadingIndicatorKey) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            RabbitLoadingIndicator(
+                                modifier = Modifier.size(28.dp)
+                            )
+                            AnimatedVisibility(
+                                visible = processingStatus != null,
+                            ) {
+                                Text(
+                                    text = processingStatus ?: "",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 为了能正确滚动到这
+                item(ScrollBottomKey) {
+                    Spacer(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(5.dp)
+                    )
+                }
             }
         }
 
@@ -674,6 +677,7 @@ private fun ChatListPreview(
             itemsIndexed(
                 items = filteredMessages,
                 key = { index, item -> item.second.id },
+                contentType = { _, item -> item.second.currentMessage.role },
             ) { _, (originalIndex, node) ->
                 val message = node.currentMessage
                 val isUser = message.role == me.rerere.ai.core.MessageRole.USER
@@ -738,7 +742,7 @@ private fun ChatSuggestionsRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        items(conversation.chatSuggestions) { suggestion ->
+        items(conversation.chatSuggestions, key = { it }) { suggestion ->
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(50))

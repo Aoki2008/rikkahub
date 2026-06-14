@@ -449,4 +449,89 @@ class QuickMessageExecutionTest {
 
         assertEquals(listOf("high"), plan.toastMessages)
     }
+
+    @Test
+    fun `getvar index reads array values and len returns array size`() {
+        val quickMessage = QuickMessage(
+            title = "Inventory",
+            content = "/setvar key=items '[\"apple\",\"banana\"]' | /getvar key=items index=1 | /echo {{pipe}} | /len items | /echo count={{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("items" to "[\"apple\",\"banana\"]"), plan.localVariables)
+        assertEquals(listOf("banana", "count=2"), plan.toastMessages)
+    }
+
+    @Test
+    fun `addvar pushes values into JSON arrays`() {
+        val quickMessage = QuickMessage(
+            title = "Inventory add",
+            content = "/setvar key=items '[\"apple\"]' | /addvar key=items banana | /getvar key=items index=1 | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("items" to "[\"apple\",\"banana\"]"), plan.localVariables)
+        assertEquals(listOf("banana"), plan.toastMessages)
+    }
+
+    @Test
+    fun `setvar and getvar index update object fields`() {
+        val quickMessage = QuickMessage(
+            title = "Object state",
+            content = "/setvar key=stats index=mood focused | /getvar key=stats index=mood | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("stats" to "{\"mood\":\"focused\"}"), plan.localVariables)
+        assertEquals(listOf("focused"), plan.toastMessages)
+    }
+
+    @Test
+    fun `setvar index supports STScript as type conversion`() {
+        val quickMessage = QuickMessage(
+            title = "Typed state",
+            content = "/setvar key=stats index=count as=number 3 | /setvar key=stats index=flags as=object '{\"ready\":true}' | /getvar key=stats index=count | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("stats" to "{\"count\":3,\"flags\":{\"ready\":true}}"), plan.localVariables)
+        assertEquals(listOf("3"), plan.toastMessages)
+    }
+
+    @Test
+    fun `setvar index keeps JSON looking values as strings without as conversion`() {
+        val quickMessage = QuickMessage(
+            title = "String state",
+            content = "/setvar key=stats index=raw '{\"ready\":true}' | /getvar key=stats index=raw | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("stats" to "{\"raw\":\"{\\\"ready\\\":true}\"}"), plan.localVariables)
+        assertEquals(listOf("{\"ready\":true}"), plan.toastMessages)
+    }
 }

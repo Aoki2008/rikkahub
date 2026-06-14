@@ -98,7 +98,6 @@ import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.FullScreen
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.R
-import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
@@ -132,7 +131,6 @@ fun ChatInput(
     loading: Boolean,
     conversation: Conversation,
     settings: Settings,
-    mcpManager: McpManager?,
     hazeState: HazeState,
     enableSearch: Boolean,
     onToggleSearch: (Boolean) -> Unit,
@@ -562,7 +560,6 @@ fun ChatInput(
                 conversation = conversation,
                 state = state,
                 assistant = assistant,
-                mcpManager = mcpManager,
                 onCompressContext = onCompressContext,
                 onUpdateAssistant = onUpdateAssistant,
                 onUpdateConversation = onUpdateConversation,

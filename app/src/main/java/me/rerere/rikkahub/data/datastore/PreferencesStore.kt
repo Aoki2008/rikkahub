@@ -564,20 +564,6 @@ class SettingsStore(
         }
     }
 
-    suspend fun updateAssistantMcpServers(assistantId: Uuid, mcpServers: Set<Uuid>) {
-        update { settings ->
-            settings.copy(
-                assistants = settings.assistants.map { assistant ->
-                    if (assistant.id == assistantId) {
-                        assistant.copy(mcpServers = mcpServers)
-                    } else {
-                        assistant
-                    }
-                }
-            )
-        }
-    }
-
     suspend fun updateAssistantInjections(
         assistantId: Uuid,
         modeInjectionIds: Set<Uuid>,

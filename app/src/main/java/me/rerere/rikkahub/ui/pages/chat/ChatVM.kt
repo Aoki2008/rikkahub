@@ -125,9 +125,6 @@ class ChatVM(
     // 生成完成
     val generationDoneFlow: SharedFlow<Uuid> = chatService.generationDoneFlow
 
-    // MCP管理器
-    val mcpManager = chatService.mcpManager
-
     // 更新设置
     fun updateSettings(newSettings: Settings) {
         viewModelScope.launch {

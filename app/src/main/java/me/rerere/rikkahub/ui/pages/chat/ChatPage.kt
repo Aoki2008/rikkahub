@@ -53,7 +53,6 @@ import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.LeftToRightListBullet
 import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
-import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
@@ -289,7 +288,6 @@ private fun ChatPageContent(
                     loading = loadingJob != null,
                     settings = setting,
                     conversation = conversation,
-                    mcpManager = if (AppFeatures.MCP) vm.mcpManager else null,
                     hazeState = hazeState,
                     onCancelClick = {
                         vm.stopGeneration()

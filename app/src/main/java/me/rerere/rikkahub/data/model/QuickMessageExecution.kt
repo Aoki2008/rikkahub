@@ -1,6 +1,15 @@
 package me.rerere.rikkahub.data.model
 
 import java.math.BigDecimal
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.parseToJsonElement
 import me.rerere.ai.core.MessageRole
 
 data class QuickMessageExecutionPlan(
@@ -205,14 +214,22 @@ private fun executeQuickMessageSlashCommands(
 
             "getvar" -> {
                 hasCompatibleCommand = true
-                pipe = state.getLocalOrGlobal(resolveVariableName(arguments, args))
+                pipe = state.getLocalOrGlobal(
+                    name = resolveVariableName(arguments, args),
+                    index = resolveVariableIndex(arguments),
+                )
             }
 
             "setvar" -> {
                 hasCompatibleCommand = true
                 val (name, value) = resolveVariableNameAndValue(arguments, args, pipe)
                 if (name.isNotBlank()) {
-                    pipe = state.setLocal(name, value)
+                    pipe = state.setLocal(
+                        name = name,
+                        value = value,
+                        index = resolveVariableIndex(arguments),
+                        asType = resolveVariableType(arguments),
+                    )
                 }
             }
 
@@ -251,14 +268,22 @@ private fun executeQuickMessageSlashCommands(
 
             "getglobalvar" -> {
                 hasCompatibleCommand = true
-                pipe = state.getGlobal(resolveVariableName(arguments, args))
+                pipe = state.getGlobal(
+                    name = resolveVariableName(arguments, args),
+                    index = resolveVariableIndex(arguments),
+                )
             }
 
             "setglobalvar" -> {
                 hasCompatibleCommand = true
                 val (name, value) = resolveVariableNameAndValue(arguments, args, pipe)
                 if (name.isNotBlank()) {
-                    pipe = state.setGlobal(name, value)
+                    pipe = state.setGlobal(
+                        name = name,
+                        value = value,
+                        index = resolveVariableIndex(arguments),
+                        asType = resolveVariableType(arguments),
+                    )
                 }
             }
 
@@ -293,6 +318,11 @@ private fun executeQuickMessageSlashCommands(
                     state.flushGlobal(name)
                     pipe = ""
                 }
+            }
+
+            "len" -> {
+                hasCompatibleCommand = true
+                pipe = state.lengthOf(resolveSlashArgument(args, pipe))
             }
 
             "sys" -> {
@@ -390,11 +420,11 @@ private class QuickMessageVariableState(
     fun variablesUpdated(): Boolean =
         local != initialLocalVariables || global != initialGlobalVariables
 
-    fun getLocalOrGlobal(name: String): String =
-        local[normalizeVariableName(name)] ?: getGlobal(name)
+    fun getLocalOrGlobal(name: String, index: String? = null): String =
+        get(local, name, index) ?: getGlobal(name, index)
 
-    fun getGlobal(name: String): String =
-        global[normalizeVariableName(name)].orEmpty()
+    fun getGlobal(name: String, index: String? = null): String =
+        get(global, name, index).orEmpty()
 
     fun getLocalOrGlobalOrNull(name: String): String? {
         val key = normalizeVariableName(name)
@@ -415,11 +445,11 @@ private class QuickMessageVariableState(
         global.putAll(globalVariables.normalizedVariableMap())
     }
 
-    fun setLocal(name: String, value: String): String =
-        set(local, name, value)
+    fun setLocal(name: String, value: String, index: String? = null, asType: String? = null): String =
+        set(local, name, value, index, asType)
 
-    fun setGlobal(name: String, value: String): String =
-        set(global, name, value)
+    fun setGlobal(name: String, value: String, index: String? = null, asType: String? = null): String =
+        set(global, name, value, index, asType)
 
     fun addLocal(name: String, increment: String): String =
         add(local, name, increment)
@@ -468,9 +498,42 @@ private class QuickMessageVariableState(
             }
         }
 
-    private fun set(target: MutableMap<String, String>, name: String, value: String): String {
+    fun lengthOf(nameOrValue: String): String {
+        val value = getLocalOrGlobalOrNull(nameOrValue) ?: nameOrValue
+        val element = parseScriptJsonElement(value) ?: return "0"
+        return when (element) {
+            is JsonArray -> element.size
+            is JsonObject -> element.size
+            else -> 0
+        }.toString()
+    }
+
+    private fun get(
+        target: Map<String, String>,
+        name: String,
+        index: String?,
+    ): String? {
+        val key = normalizeVariableName(name)
+        val value = target[key] ?: return null
+        val normalizedIndex = index?.trim().orEmpty()
+        if (normalizedIndex.isBlank()) return value
+        return readIndexedVariable(value, normalizedIndex)
+    }
+
+    private fun set(
+        target: MutableMap<String, String>,
+        name: String,
+        value: String,
+        index: String?,
+        asType: String?,
+    ): String {
         val key = normalizeVariableName(name)
         if (key.isBlank()) return ""
+        val normalizedIndex = index?.trim().orEmpty()
+        if (normalizedIndex.isNotBlank()) {
+            target[key] = writeIndexedVariable(target[key], normalizedIndex, value, asType)
+            return value
+        }
         target[key] = value
         return value
     }
@@ -479,11 +542,93 @@ private class QuickMessageVariableState(
         val key = normalizeVariableName(name)
         if (key.isBlank()) return ""
         val current = target[key].orEmpty()
-        val next = addVariableValues(current, increment)
+        val next = addVariableToJsonArray(current, increment)
+            ?: addVariableValues(current, increment)
         target[key] = next
         return next
     }
 }
+
+private val quickMessageJson = Json {
+    isLenient = true
+    ignoreUnknownKeys = true
+}
+
+private fun readIndexedVariable(value: String, index: String): String {
+    val element = parseScriptJsonElement(value) ?: return ""
+    return when (element) {
+        is JsonArray -> index.toIntOrNull()
+            ?.let { element.getOrNull(it) }
+            ?.toScriptVariableValue()
+            .orEmpty()
+
+        is JsonObject -> element[index]
+            ?.toScriptVariableValue()
+            .orEmpty()
+
+        else -> ""
+    }
+}
+
+private fun writeIndexedVariable(
+    current: String?,
+    index: String,
+    value: String,
+    asType: String?,
+): String {
+    val element = current?.let(::parseScriptJsonElement)
+    val newElement = value.toScriptJsonElement(asType)
+    val numericIndex = index.toIntOrNull()
+
+    return if (numericIndex != null && numericIndex >= 0) {
+        val values = (element as? JsonArray)?.toMutableList() ?: mutableListOf()
+        while (values.size <= numericIndex) {
+            values += JsonPrimitive("")
+        }
+        values[numericIndex] = newElement
+        JsonArray(values).toString()
+    } else {
+        val values = (element as? JsonObject)?.toMutableMap() ?: mutableMapOf()
+        values[index] = newElement
+        JsonObject(values).toString()
+    }
+}
+
+private fun addVariableToJsonArray(current: String, increment: String): String? {
+    val array = parseScriptJsonElement(current) as? JsonArray ?: return null
+    return JsonArray(array + JsonPrimitive(increment)).toString()
+}
+
+private fun parseScriptJsonElement(value: String): JsonElement? =
+    runCatching { quickMessageJson.parseToJsonElement(value) }.getOrNull()
+
+private fun String.toScriptJsonElement(asType: String?): JsonElement =
+    when (asType?.trim()?.lowercase()) {
+        "string", "str" -> JsonPrimitive(this)
+        "null", "undefined", "none" -> JsonNull
+        "number" -> toScriptNumberElement()
+        "int" -> trim().toIntOrNull()?.let { JsonPrimitive(it) } ?: JsonNull
+        "float" -> trim().toDoubleOrNull()?.takeIf { it.isFinite() }?.let { JsonPrimitive(it) } ?: JsonNull
+        "boolean", "bool" -> JsonPrimitive(trim().lowercase() in setOf("on", "true", "1"))
+        "list", "array" -> parseScriptJsonElement(this) as? JsonArray ?: JsonArray(emptyList())
+        "object", "dict", "dictionary" -> parseScriptJsonElement(this)
+            ?.takeIf { it is JsonObject || it is JsonArray || it is JsonNull }
+            ?: JsonObject(emptyMap())
+
+        else -> JsonPrimitive(this)
+    }
+
+private fun String.toScriptNumberElement(): JsonElement {
+    val trimmed = trim()
+    return trimmed.toLongOrNull()?.let { JsonPrimitive(it) }
+        ?: trimmed.toDoubleOrNull()?.takeIf { it.isFinite() }?.let { JsonPrimitive(it) }
+        ?: JsonNull
+}
+
+private fun JsonElement.toScriptVariableValue(): String =
+    runCatching { jsonPrimitive.contentOrNull }
+        .getOrNull()
+        ?: toString()
 
 private fun Map<String, String>.normalizedVariableMap(): Map<String, String> =
     entries
@@ -499,6 +644,12 @@ private fun resolveVariableName(arguments: SlashArguments, args: String): String
     arguments.named["key"]
         ?: arguments.named["name"]
         ?: splitFirstSlashArgument(args).first
+
+private fun resolveVariableIndex(arguments: SlashArguments): String? =
+    arguments.named["index"]
+
+private fun resolveVariableType(arguments: SlashArguments): String? =
+    arguments.named["as"]
 
 private fun resolveVariableNameAndValue(
     arguments: SlashArguments,

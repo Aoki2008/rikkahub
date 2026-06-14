@@ -31,10 +31,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.jsonObject
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
-import me.rerere.ai.core.Tool
 import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ModelAbility
 import me.rerere.ai.provider.ProviderManager
@@ -55,7 +53,6 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.RouteActivity
 import me.rerere.rikkahub.data.ai.GenerationChunk
 import me.rerere.rikkahub.data.ai.GenerationHandler
-import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.tools.LocalTools
 import me.rerere.rikkahub.data.ai.tools.createSearchTools
 import me.rerere.rikkahub.data.ai.tools.createSkillTools
@@ -170,7 +167,6 @@ class ChatService(
     private val templateTransformer: TemplateTransformer,
     private val providerManager: ProviderManager,
     private val localTools: LocalTools,
-    val mcpManager: McpManager?,
     private val filesManager: FilesManager,
     private val skillManager: SkillManager,
 ) {
@@ -731,7 +727,7 @@ class ChatService(
 
             // memory tool
             if (!model.abilities.contains(ModelAbility.TOOL)) {
-                if (settings.enableWebSearch || (AppFeatures.MCP && mcpManager?.getAllAvailableTools().orEmpty().isNotEmpty())) {
+                if (settings.enableWebSearch) {
                     addError(
                         IllegalStateException(context.getString(R.string.tools_warning)),
                         conversationId,
@@ -774,7 +770,6 @@ class ChatService(
                 outputTransformers = outputTransformers,
                 senderId = senderId,
                 tools = buildList {
-                    val activeMcpManager = mcpManager
                     if (settings.enableWebSearch) {
                         addAll(createSearchTools(settings))
                     }
@@ -787,21 +782,6 @@ class ChatService(
                                 skillManager = skillManager,
                             )
                         )
-                    }
-                    if (AppFeatures.MCP && activeMcpManager != null) {
-                        activeMcpManager.getAllAvailableTools().forEach { (serverId, tool) ->
-                            add(
-                                Tool(
-                                    name = "mcp__" + tool.name,
-                                    description = tool.description ?: "",
-                                    parameters = { tool.inputSchema },
-                                    needsApproval = tool.needsApproval,
-                                    execute = {
-                                        activeMcpManager.callTool(serverId, tool.name, it.jsonObject)
-                                    },
-                                )
-                            )
-                        }
                     }
                 },
             ).onCompletion {
@@ -1254,10 +1234,9 @@ class ChatService(
         return when {
             // 正在执行工具
             lastTool != null && !lastTool.isExecuted -> {
-                val toolName = lastTool.toolName.removePrefix("mcp__")
                 Triple(
                     context.getString(R.string.notification_live_update_chip_tool),
-                    context.getString(R.string.notification_live_update_tool, toolName),
+                    context.getString(R.string.notification_live_update_tool, lastTool.toolName),
                     lastTool.input.take(100)
                 )
             }

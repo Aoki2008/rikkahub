@@ -145,6 +145,43 @@ class SillyTavernResourceImporterTest {
     }
 
     @Test
+    fun `parse SillyTavern content manager index includes extension catalog entries`() {
+        val assets = parseSillyTavernContentIndex(
+            """
+            [
+              {
+                "id": "Extension-Audio",
+                "type": "Extension",
+                "name": "Dynamic Audio",
+                "description": "Adds immersive background music and ambient sounds to your chats.",
+                "url": "https://github.com/SillyTavern/Extension-Audio"
+              },
+              {
+                "type": "character",
+                "id": "default_CodingSensei.png",
+                "url": "https://raw.githubusercontent.com/SillyTavern/SillyTavern-Content/main/assets/character/default_CodingSensei.png",
+                "name": "Coding Sensei",
+                "description": "Coding assistance."
+              },
+              {
+                "type": "bgm",
+                "id": "calm-bittersweet.ogg",
+                "url": "https://raw.githubusercontent.com/SillyTavern/SillyTavern-Content/main/assets/bgm/calm-bittersweet.ogg"
+              }
+            ]
+            """.trimIndent()
+        )
+
+        assertEquals(2, assets.size)
+        assertEquals("extension", assets.first().type)
+        assertEquals("Dynamic Audio", assets.first().displayName)
+        assertEquals("https://github.com/SillyTavern/Extension-Audio", assets.first().downloadUrl)
+        assertEquals("Adds immersive background music and ambient sounds to your chats.", assets.first().description)
+        assertEquals("Coding Sensei", assets[1].displayName)
+        assertEquals("Coding assistance.", assets[1].description)
+    }
+
+    @Test
     fun `parse SillyTavern sprite directory keeps image files`() {
         val sprites = parseSillyTavernSpriteFiles(
             """
