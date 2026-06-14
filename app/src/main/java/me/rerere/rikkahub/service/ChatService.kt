@@ -81,9 +81,14 @@ import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.AssistantAffectScope
+import me.rerere.rikkahub.data.model.ChatGroup
+import me.rerere.rikkahub.data.model.activeMembers
+import me.rerere.rikkahub.data.model.planResponders
 import me.rerere.rikkahub.data.model.replaceRegexes
 import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.data.model.buildInitialMessageNodes
+import me.rerere.rikkahub.data.model.buildGroupInitialNodes
+import me.rerere.rikkahub.data.model.GroupGreetingMember
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.web.BadRequestException
@@ -94,6 +99,8 @@ import me.rerere.rikkahub.utils.cancelNotification
 import java.time.Instant
 import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.coroutines.coroutineContext
+import kotlinx.coroutines.isActive
 import kotlin.uuid.Uuid
 
 private const val TAG = "ChatService"
@@ -308,16 +315,44 @@ class ChatService(
         } else {
             // 新建对话, 并添加预设消息（含备选问候语 swipe）
             val currentSettings = settingsStore.settingsFlowRaw.first()
-            val assistant = currentSettings.getCurrentAssistant()
-            val newConversation = Conversation.ofId(
-                id = conversationId,
-                assistantId = assistant.id,
-                messages = buildInitialMessageNodes(
-                    presetMessages = assistant.presetMessages,
-                    alternateGreetings = assistant.characterCard?.alternateGreetings ?: emptyList(),
-                ),
-                newConversation = true
-            )
+            val group = currentSettings.selectedGroupId
+                ?.let { id -> currentSettings.chatGroups.firstOrNull { it.id == id } }
+            val activeMembers = group?.activeMembers()
+                ?.mapNotNull { currentSettings.getAssistantById(it) }
+                ?: emptyList()
+
+            val newConversation = if (group != null && activeMembers.isNotEmpty()) {
+                // 群聊新对话：绑定群组，assistantId 取首位成员（供单人路径回退），
+                // 问候语来自各成员并带 senderId 归属。
+                Conversation.ofId(
+                    id = conversationId,
+                    assistantId = activeMembers.first().id,
+                    groupId = group.id,
+                    messages = buildGroupInitialNodes(
+                        activeMembers.map { member ->
+                            GroupGreetingMember(
+                                assistantId = member.id,
+                                presetMessages = member.presetMessages,
+                                alternateGreetings = member.characterCard?.alternateGreetings
+                                    ?: emptyList(),
+                            )
+                        }
+                    ),
+                    newConversation = true
+                )
+            } else {
+                val assistant = currentSettings.getCurrentAssistant()
+                Conversation.ofId(
+                    id = conversationId,
+                    assistantId = assistant.id,
+                    messages = buildInitialMessageNodes(
+                        presetMessages = assistant.presetMessages,
+                        alternateGreetings = assistant.characterCard?.alternateGreetings
+                            ?: emptyList(),
+                    ),
+                    newConversation = true
+                )
+            }
             updateConversation(conversationId, newConversation)
         }
     }
@@ -496,9 +531,91 @@ class ChatService(
     ) {
         val settings = settingsStore.settingsFlow.first()
         val initialConversation = getConversationFlow(conversationId).value
-        val assistant = settings.getAssistantById(initialConversation.assistantId)
-            ?: settings.getCurrentAssistant()
-        val model = settings.findModelById(assistant.chatModelId ?: settings.chatModelId) ?: return
+        val group = initialConversation.groupId
+            ?.let { id -> settings.chatGroups.firstOrNull { it.id == id } }
+
+        if (group == null) {
+            // 单人对话：与原逻辑保持一致（不传 senderId）
+            val assistant = settings.getAssistantById(initialConversation.assistantId)
+                ?: settings.getCurrentAssistant()
+            val model = settings.findModelById(assistant.chatModelId ?: settings.chatModelId) ?: return
+            generateOneReply(
+                conversationId = conversationId,
+                settings = settings,
+                assistant = assistant,
+                model = model,
+                senderId = null,
+                messageRange = messageRange,
+            )
+        } else {
+            handleGroupMessageComplete(conversationId, settings, group, messageRange)
+        }
+    }
+
+    // ---- 群聊：按激活策略依次让成员发言 ----
+
+    private suspend fun handleGroupMessageComplete(
+        conversationId: Uuid,
+        settings: Settings,
+        group: ChatGroup,
+        messageRange: ClosedRange<Int>?,
+    ) {
+        val conversation = getConversationFlow(conversationId).value
+        val memberNames = group.memberIds.associateWith { settings.getAssistantById(it)?.name.orEmpty() }
+
+        val responders: List<Uuid> = if (messageRange != null) {
+            // 重新生成：让产出被重新生成消息的成员重做（其 senderId）；否则回退到首位激活成员
+            val regenNode = conversation.messageNodes.getOrNull(messageRange.endInclusive + 1)
+            val regenSenderId = regenNode?.messages?.getOrNull(regenNode.selectIndex)?.senderId
+            listOfNotNull(regenSenderId ?: group.activeMembers().firstOrNull())
+        } else {
+            group.planResponders(conversation.currentMessages, memberNames)
+        }
+
+        var generated = false
+        for (memberId in responders) {
+            // 会话被取消时（停止生成）跳出循环，避免后续成员继续发言
+            if (!coroutineContext.isActive) break
+
+            val member = settings.getAssistantById(memberId) ?: continue
+            val model = settings.findModelById(member.chatModelId ?: settings.chatModelId) ?: continue
+            // 群聊中每位成员的标题/建议生成统一在循环结束后只做一次
+            generateOneReply(
+                conversationId = conversationId,
+                settings = settings,
+                assistant = member,
+                model = model,
+                senderId = memberId,
+                messageRange = messageRange,
+                generateFollowups = false,
+            )
+            generated = true
+        }
+
+        // 整轮回复结束后再生成标题与建议（仅一次）
+        if (generated && coroutineContext.isActive) {
+            val finalConversation = getConversationFlow(conversationId).value
+            launchWithConversationReference(conversationId) {
+                generateTitle(conversationId, finalConversation)
+            }
+            launchWithConversationReference(conversationId) {
+                generateSuggestion(conversationId, finalConversation)
+            }
+        }
+    }
+
+    // ---- 单次回复（单人对话 / 群聊单个成员复用此核心） ----
+
+    private suspend fun generateOneReply(
+        conversationId: Uuid,
+        settings: Settings,
+        assistant: Assistant,
+        model: Model,
+        senderId: Uuid?,
+        messageRange: ClosedRange<Int>? = null,
+        generateFollowups: Boolean = true,
+    ) {
+        val initialConversation = getConversationFlow(conversationId).value
 
         val senderName = if (assistant.useAssistantAvatar) {
             assistant.name.ifEmpty { context.getString(R.string.assistant_page_default_assistant) }
@@ -553,6 +670,7 @@ class ChatService(
                     add(templateTransformer)
                 },
                 outputTransformers = outputTransformers,
+                senderId = senderId,
                 tools = buildList {
                     if (settings.enableWebSearch) {
                         addAll(createSearchTools(settings))
@@ -618,17 +736,19 @@ class ChatService(
 
             it.printStackTrace()
             addError(it, conversationId, title = context.getString(R.string.error_title_generation))
-            Logging.log(TAG, "handleMessageComplete: $it")
+            Logging.log(TAG, "generateOneReply: $it")
             Logging.log(TAG, it.stackTraceToString())
         }.onSuccess {
             val finalConversation = getConversationFlow(conversationId).value
             saveConversation(conversationId, finalConversation)
 
-            launchWithConversationReference(conversationId) {
-                generateTitle(conversationId, finalConversation)
-            }
-            launchWithConversationReference(conversationId) {
-                generateSuggestion(conversationId, finalConversation)
+            if (generateFollowups) {
+                launchWithConversationReference(conversationId) {
+                    generateTitle(conversationId, finalConversation)
+                }
+                launchWithConversationReference(conversationId) {
+                    generateSuggestion(conversationId, finalConversation)
+                }
             }
         }
     }
@@ -1187,6 +1307,7 @@ class ChatService(
             customSystemPrompt = currentConversation.customSystemPrompt,
             modeInjectionIds = currentConversation.modeInjectionIds,
             lorebookIds = currentConversation.lorebookIds,
+            groupId = currentConversation.groupId,
         )
 
         saveConversation(forkConversation.id, forkConversation)

@@ -263,6 +263,11 @@ private fun ChatListNormal(
     val assistant = remember(settings.assistants, conversation.assistantId) {
         settings.getAssistantById(conversation.assistantId)
     }
+    // 群聊：每条消息按 senderId 归属到对应成员(助手)
+    val isGroupConversation = conversation.groupId != null
+    val assistantById = remember(settings.assistants) {
+        settings.assistants.associateBy { it.id }
+    }
     val modelById = remember(settings.providers) {
         settings.providers
             .flatMap { it.models }
@@ -329,10 +334,17 @@ private fun ChatListNormal(
                         selectedKeys = selectedItems,
                         enabled = selecting,
                     ) {
+                        val senderId = node.currentMessage.senderId
+                        val memberAssistant = if (isGroupConversation && senderId != null) {
+                            assistantById[senderId] ?: assistant
+                        } else {
+                            assistant
+                        }
                         ChatMessage(
                             node = node,
                             model = node.currentMessage.modelId?.let(modelById::get),
-                            assistant = assistant,
+                            assistant = memberAssistant,
+                            forceAssistantAvatar = isGroupConversation && senderId != null,
                             loading = loading && index == lastMessageIndex,
                             onRegenerate = {
                                 onRegenerate(node.currentMessage)

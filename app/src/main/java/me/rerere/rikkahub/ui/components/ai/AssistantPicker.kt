@@ -47,6 +47,7 @@ import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.ChatGroup
 import me.rerere.rikkahub.ui.components.ui.UIAvatar
 import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.hooks.rememberAssistantState
@@ -63,6 +64,12 @@ fun AssistantPicker(
     val defaultAssistantName = stringResource(R.string.assistant_page_default_assistant)
     var showPicker by remember { mutableStateOf(false) }
 
+    val currentGroup = state.currentGroup
+    // 标签：群聊模式显示群组名/头像，否则显示当前助手
+    val label = currentGroup?.name?.ifEmpty { "Group Chat" }
+        ?: state.currentAssistant.name.ifEmpty { defaultAssistantName }
+    val labelAvatar = currentGroup?.avatar ?: state.currentAssistant.avatar
+
     NavigationDrawerItem(
         icon = {
             Icon(HugeIcons.LookTop, contentDescription = null)
@@ -72,7 +79,7 @@ fun AssistantPicker(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    text = state.currentAssistant.name.ifEmpty { defaultAssistantName },
+                    text = label,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -80,8 +87,8 @@ fun AssistantPicker(
                 Spacer(Modifier.weight(1f))
 
                 UIAvatar(
-                    name = state.currentAssistant.name.ifEmpty { defaultAssistantName },
-                    value = state.currentAssistant.avatar,
+                    name = label,
+                    value = labelAvatar,
                     onClick = onClickSetting
                 )
             }
@@ -97,9 +104,14 @@ fun AssistantPicker(
         AssistantPickerSheet(
             settings = settings,
             currentAssistant = state.currentAssistant,
+            currentGroupId = currentGroup?.id,
             onAssistantSelected = { assistant ->
                 showPicker = false
                 state.setSelectAssistant(assistant)
+            },
+            onGroupSelected = { group ->
+                showPicker = false
+                state.setSelectGroup(group)
             },
             onDismiss = {
                 showPicker = false
@@ -112,12 +124,15 @@ fun AssistantPicker(
 private fun AssistantPickerSheet(
     settings: Settings,
     currentAssistant: Assistant,
+    currentGroupId: Uuid?,
     onAssistantSelected: (Assistant) -> Unit,
+    onGroupSelected: (ChatGroup) -> Unit,
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberBottomSheetState(initialValue = SheetValue.Hidden, enabledValues = setOf(SheetValue.Hidden, SheetValue.Expanded))
     val scope = rememberCoroutineScope()
     val defaultAssistantName = stringResource(R.string.assistant_page_default_assistant)
+    val defaultGroupName = "Group Chat"
 
     // 标签过滤状态
     var selectedTagIds by remember { mutableStateOf(emptySet<Uuid>()) }
@@ -174,14 +189,54 @@ private fun AssistantPickerSheet(
                 Spacer(modifier = Modifier.height(8.dp))
             }
 
-            // 助手列表
+            // 助手 / 群聊列表
             val navController = LocalNavController.current
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
+                // 群聊分组（仅当存在群聊时显示）
+                if (settings.chatGroups.isNotEmpty()) {
+                    item(key = "__group_header__") {
+                        Text(
+                            text = "Group Chats",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                    items(settings.chatGroups, key = { "group_${it.id}" }) { group ->
+                        val checked = group.id == currentGroupId
+                        Card(
+                            onClick = { onGroupSelected(group) },
+                            modifier = Modifier.animateItem(),
+                            shape = MaterialTheme.shapes.large,
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (checked) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surface,
+                                contentColor = if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface,
+                            ),
+                        ) {
+                            GroupItem(
+                                group = group,
+                                memberCount = group.memberIds.count { id ->
+                                    settings.assistants.any { it.id == id }
+                                },
+                                defaultGroupName = defaultGroupName,
+                            )
+                        }
+                    }
+                    item(key = "__assistant_header__") {
+                        Text(
+                            text = "Assistants",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                }
+
                 items(filteredAssistants, key = { it.id }) { assistant ->
-                    val checked = assistant.id == currentAssistant.id
+                    val checked = assistant.id == currentAssistant.id && currentGroupId == null
                     Card(
                         onClick = { onAssistantSelected(assistant) },
                         modifier = Modifier.animateItem(),
@@ -207,6 +262,37 @@ private fun AssistantPickerSheet(
             }
         }
     }
+}
+
+@Composable
+private fun GroupItem(
+    group: ChatGroup,
+    memberCount: Int,
+    defaultGroupName: String,
+) {
+    ListItem(
+        headlineContent = {
+            Text(
+                text = group.name.ifEmpty { defaultGroupName },
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        },
+        supportingContent = {
+            Text(
+                text = "$memberCount members",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        },
+        leadingContent = {
+            UIAvatar(
+                name = group.name.ifEmpty { defaultGroupName },
+                value = group.avatar,
+                modifier = Modifier.size(32.dp)
+            )
+        },
+        colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+    )
 }
 
 @Composable

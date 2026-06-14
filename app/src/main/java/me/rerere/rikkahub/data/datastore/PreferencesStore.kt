@@ -150,6 +150,7 @@ class SettingsStore(
         val PERSONAS = stringPreferencesKey("personas")
         val SELECTED_PERSONA = stringPreferencesKey("selected_persona")
         val CHAT_GROUPS = stringPreferencesKey("chat_groups")
+        val SELECTED_GROUP = stringPreferencesKey("selected_group")
         val PROMPT_PRESETS = stringPreferencesKey("prompt_presets")
 
         // 备份提醒
@@ -250,6 +251,7 @@ class SettingsStore(
                 chatGroups = preferences[CHAT_GROUPS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
+                selectedGroupId = preferences[SELECTED_GROUP]?.let { Uuid.parse(it) },
                 promptPresets = preferences[PROMPT_PRESETS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
@@ -365,6 +367,8 @@ class SettingsStore(
                 selectedPersonaId = settings.selectedPersonaId
                     ?.takeIf { id -> settings.personas.any { it.id == id } },
                 chatGroups = settings.chatGroups.distinctBy { it.id },
+                selectedGroupId = settings.selectedGroupId
+                    ?.takeIf { id -> settings.chatGroups.any { it.id == id } },
                 promptPresets = settings.promptPresets.distinctBy { it.id },
             )
         }
@@ -441,6 +445,9 @@ class SettingsStore(
             settings.selectedPersonaId?.let {
                 preferences[SELECTED_PERSONA] = it.toString()
             } ?: preferences.remove(SELECTED_PERSONA)
+            settings.selectedGroupId?.let {
+                preferences[SELECTED_GROUP] = it.toString()
+            } ?: preferences.remove(SELECTED_GROUP)
             preferences[WEB_SERVER_ENABLED] = settings.webServerEnabled
             preferences[WEB_SERVER_PORT] = settings.webServerPort
             preferences[WEB_SERVER_JWT_ENABLED] = settings.webServerJwtEnabled
@@ -574,6 +581,7 @@ data class Settings(
     val personas: List<Persona> = emptyList(),
     val selectedPersonaId: Uuid? = null,
     val chatGroups: List<ChatGroup> = emptyList(),
+    val selectedGroupId: Uuid? = null,
     val promptPresets: List<PromptPreset> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,

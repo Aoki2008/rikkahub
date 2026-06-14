@@ -82,12 +82,16 @@ jobs:
             --tests "me.rerere.rikkahub.data.ai.transformers.WorldInfoBudgetTest" \
             --tests "me.rerere.rikkahub.data.model.WorldInfoActivationTest" \
             --tests "me.rerere.rikkahub.data.model.GroupActivationTest" \
+            --tests "me.rerere.rikkahub.data.model.GroupResponderPlanningTest" \
+            --tests "me.rerere.rikkahub.data.model.GroupGreetingNodesTest" \
             --tests "me.rerere.rikkahub.data.model.InitialMessageNodesTest" \
             --tests "me.rerere.rikkahub.data.export.CharacterCardExporterTest" \
             --tests "me.rerere.rikkahub.utils.PngTextChunkTest" \
             --tests "me.rerere.rikkahub.data.ai.PromptManagerAssemblerTest" \
             --tests "me.rerere.rikkahub.data.model.PromptPresetParserTest" \
-            --tests "me.rerere.rikkahub.data.ai.transformers.PromptManagerIntegrationTest"
+            --tests "me.rerere.rikkahub.data.ai.transformers.PromptManagerIntegrationTest" \
+            --tests "me.rerere.rikkahub.data.model.TextCompletionPresetParserTest" \
+            --tests "me.rerere.rikkahub.data.ai.TextCompletionPromptAssemblerTest"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace

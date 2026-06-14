@@ -26,6 +26,9 @@ data class UIMessage(
         .toLocalDateTime(TimeZone.currentSystemDefault()),
     val finishedAt: LocalDateTime? = null,
     val modelId: Uuid? = null,
+    // 群聊场景下，标记该消息由哪个成员(助手)生成；单人对话为 null。
+    // 用于群聊回复归属(头像/名称)与轮转策略的 lastSpeakerId 推导。
+    val senderId: Uuid? = null,
     val usage: TokenUsage? = null,
     val translation: String? = null
 ) {
@@ -215,16 +218,26 @@ data class UIMessage(
  * @receiver 已有消息列表
  * @param chunk 消息chunk
  * @param model 模型, 可以不传，如果传了，会把模型id写入到消息，标记是哪个模型输出的消息
+ * @param senderId 群聊成员id, 可以不传; 新建的消息会写入该id, 标记由哪个成员生成
  * @return 新消息列表
  */
-fun List<UIMessage>.handleMessageChunk(chunk: MessageChunk, model: Model? = null): List<UIMessage> {
+fun List<UIMessage>.handleMessageChunk(
+    chunk: MessageChunk,
+    model: Model? = null,
+    senderId: Uuid? = null,
+): List<UIMessage> {
     require(this.isNotEmpty()) {
         "messages must not be empty"
     }
     val choice = chunk.choices.getOrNull(0) ?: return this
     val message = choice.delta ?: choice.message ?: return this
     if (this.last().role != message.role) {
-        return this + (UIMessage(modelId = model?.id, role = message.role, parts = emptyList()) + chunk)
+        return this + (UIMessage(
+            modelId = model?.id,
+            senderId = senderId,
+            role = message.role,
+            parts = emptyList()
+        ) + chunk)
     } else {
         val last = this.last() + chunk
         return this.dropLast(1) + last

@@ -86,7 +86,7 @@ than rebuilding.
    - Probability/groups tested in `WorldInfoSelectionTest`.
 
 ### Phase 4 — Group chats, character export
-7. **[PARTIAL] Multi-character group conversations**
+7. **[DONE] Multi-character group conversations**
    - [DONE] Engine: `ChatGroup` model (members, muted, strategy, self-responses)
      + `GroupActivationStrategy` (NATURAL/LIST/MANUAL) + pure `selectResponders`
      (mention detection, round-robin rotation, self-response filtering).
@@ -96,11 +96,28 @@ than rebuilding.
    - [DONE] Group management UI: `ChatGroupSection`/`ChatGroupEditDialog` in
      `SettingPreferencesGeneralPage` (create/edit/delete, member multi-select,
      strategy picker, self-response toggle).
-   - [TODO] Generation integration: per-turn member selection in `ChatService`,
-     each responder generates with its own assistant config + per-message
-     attribution. **Turnkey design in `docs/group-chat-integration-design.md`**
-     (change points, data-model deltas, `handleMessageComplete` group branch,
-     MVP slice, test plan, risks). Needs a build to verify.
+   - [DONE] **Generation integration**: per-turn member selection in `ChatService`.
+     - `UIMessage.senderId` (ai module, additive nullable) marks the producing
+       member; `handleMessageChunk` stamps it; `GenerationHandler.generateText`
+       threads it through.
+     - `Conversation.groupId` (model + `ConversationEntity.group_id` column +
+       Room **AutoMigration 20→21** + repo mapping) marks a group conversation.
+     - `handleMessageComplete` refactored into pure-by-construction
+       `generateOneReply(...)` (single path **byte-for-byte equivalent**) +
+       `handleGroupMessageComplete` group branch: derives lastSpeaker from the
+       last ASSISTANT `senderId`, runs `ChatGroup.planResponders`, then
+       sequentially `generateOneReply` per member (each sees the prior member's
+       reply; cancellation via `coroutineContext.isActive` breaks the loop;
+       title/suggestion generated once after the round).
+     - Entry point: `Settings.selectedGroupId` (mirrors `selectedPersonaId`),
+       group picker section in `AssistantPicker` (drawer), group-aware
+       `initializeConversation` seeding member greetings via
+       `buildGroupInitialNodes` (each stamped with `senderId`).
+     - UI attribution: `ChatList` resolves each ASSISTANT message's member by
+       `senderId` and renders its avatar/name (`forceAssistantAvatar`).
+     - Tested: `GroupResponderPlanningTest`, `GroupGreetingNodesTest`
+       (+ existing `GroupActivationTest`). Registered in CI.
+     - Design notes: `docs/group-chat-integration-design.md`.
 8. **[DONE] Character card export** (round-trips the rich import).
    - [DONE] `CharacterCardExporter.buildV3Card(assistant, lorebooks)` builds a
      `chara_card_v3` JSON symmetric to the importer (fields + `character_book`

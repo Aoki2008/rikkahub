@@ -80,6 +80,7 @@ class GenerationHandler(
         conversationSystemPrompt: String? = null,
         conversationModeInjectionIds: Set<Uuid> = emptySet(),
         conversationLorebookIds: Set<Uuid> = emptySet(),
+        senderId: Uuid? = null,
     ): Flow<GenerationChunk> = flow {
         val provider = model.findProvider(settings.providers) ?: error("Provider not found")
         val providerImpl = providerManager.getProviderByType(provider)
@@ -157,6 +158,7 @@ class GenerationHandler(
                     conversationSystemPrompt = conversationSystemPrompt,
                     conversationModeInjectionIds = conversationModeInjectionIds,
                     conversationLorebookIds = conversationLorebookIds,
+                    senderId = senderId,
                 )
                 messages = messages.visualTransforms(
                     transformers = outputTransformers,
@@ -349,6 +351,7 @@ class GenerationHandler(
         conversationSystemPrompt: String? = null,
         conversationModeInjectionIds: Set<Uuid> = emptySet(),
         conversationLorebookIds: Set<Uuid> = emptySet(),
+        senderId: Uuid? = null,
     ) {
         val internalMessages = buildList {
             val system = buildString {
@@ -425,7 +428,7 @@ class GenerationHandler(
                 messages = internalMessages,
                 params = params
             ).collect {
-                messages = messages.handleMessageChunk(chunk = it, model = model)
+                messages = messages.handleMessageChunk(chunk = it, model = model, senderId = senderId)
                 it.usage?.let { usage ->
                     messages = messages.mapIndexed { index, message ->
                         if (index == messages.lastIndex) {
@@ -451,7 +454,7 @@ class GenerationHandler(
                 messages = internalMessages,
                 params = params,
             )
-            messages = messages.handleMessageChunk(chunk = chunk, model = model)
+            messages = messages.handleMessageChunk(chunk = chunk, model = model, senderId = senderId)
             chunk.usage?.let { usage ->
                 messages = messages.mapIndexed { index, message ->
                     if (index == messages.lastIndex) {

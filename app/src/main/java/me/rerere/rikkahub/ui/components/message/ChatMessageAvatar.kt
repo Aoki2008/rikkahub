@@ -57,10 +57,12 @@ fun ChatMessageAssistantAvatar(
     model: Model?,
     assistant: Assistant?,
     modifier: Modifier = Modifier,
+    forceAssistantAvatar: Boolean = false,
 ) {
     val settings = LocalSettings.current
     val showIcon = settings.displaySetting.showModelIcon
-    val useAssistantAvatar = assistant?.useAssistantAvatar == true
+    // 群聊场景下强制以成员(助手)身份展示头像/名称，确保每条消息可归属到对应成员
+    val useAssistantAvatar = assistant != null && (assistant.useAssistantAvatar || forceAssistantAvatar)
     if (message.role == MessageRole.ASSISTANT && (model != null || useAssistantAvatar)) {
         Row(
             horizontalArrangement = Arrangement.spacedBy(8.dp),

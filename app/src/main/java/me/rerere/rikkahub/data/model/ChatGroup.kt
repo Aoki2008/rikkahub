@@ -1,6 +1,8 @@
 package me.rerere.rikkahub.data.model
 
 import kotlinx.serialization.Serializable
+import me.rerere.ai.core.MessageRole
+import me.rerere.ai.ui.UIMessage
 import kotlin.uuid.Uuid
 
 /**
@@ -86,4 +88,23 @@ private fun nextInRotation(active: List<Uuid>, lastSpeakerId: Uuid?): Uuid? {
     if (active.isEmpty()) return null
     val lastIndex = lastSpeakerId?.let { active.indexOf(it) } ?: -1
     return active[(lastIndex + 1) % active.size]
+}
+
+/**
+ * 根据当前消息列表规划本轮发言成员（纯函数，便于测试）。
+ *
+ * 从消息历史推导 [selectResponders] 所需的上下文：
+ * - lastMessageText = 最近一条 USER 消息文本（NATURAL 策略的提及检测）
+ * - lastSpeakerId   = 最近一条 ASSISTANT 消息的 [UIMessage.senderId]（轮转/防自言自语）
+ *
+ * @param messages 对话的当前消息列表（通常为 Conversation.currentMessages）
+ * @param memberNames 成员 ID → 名称
+ */
+fun ChatGroup.planResponders(
+    messages: List<UIMessage>,
+    memberNames: Map<Uuid, String>,
+): List<Uuid> {
+    val lastText = messages.lastOrNull { it.role == MessageRole.USER }?.toText().orEmpty()
+    val lastSpeaker = messages.lastOrNull { it.role == MessageRole.ASSISTANT }?.senderId
+    return selectResponders(memberNames, lastText, lastSpeaker)
 }

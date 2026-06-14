@@ -105,6 +105,7 @@ fun ChatMessage(
     model: Model? = null,
     assistant: Assistant? = null,
     lastMessage: Boolean = false,
+    forceAssistantAvatar: Boolean = false,
     onFork: () -> Unit,
     onRegenerate: () -> Unit,
     onEdit: () -> Unit,
@@ -148,6 +149,7 @@ fun ChatMessage(
                     model = model,
                     assistant = assistant,
                     loading = loading,
+                    forceAssistantAvatar = forceAssistantAvatar,
                     modifier = Modifier.weight(1f)
                 )
                 ChatMessageUserAvatar(

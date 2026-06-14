@@ -27,6 +27,9 @@ data class Conversation(
     val customSystemPrompt: String? = null,
     val modeInjectionIds: Set<Uuid> = emptySet(),
     val lorebookIds: Set<Uuid> = emptySet(),
+    // 非空时表示这是一个群聊(多角色)对话，引用 Settings.chatGroups 中的某个 ChatGroup。
+    // 此时每轮回复由群聊激活策略选择成员发言，assistantId 取首位成员(供既有单人路径回退使用)。
+    val groupId: Uuid? = null,
     @Transient
     val newConversation: Boolean = false
 ) {
@@ -91,11 +94,13 @@ data class Conversation(
             id: Uuid,
             assistantId: Uuid = DEFAULT_ASSISTANT_ID,
             messages: List<MessageNode> = emptyList(),
+            groupId: Uuid? = null,
             newConversation: Boolean = false
         ) = Conversation(
             id = id,
             assistantId = assistantId,
             messageNodes = messages,
+            groupId = groupId,
             newConversation = newConversation,
         )
     }
@@ -158,6 +163,33 @@ fun buildInitialMessageNodes(
             message.toMessageNode()
         }
     }
+}
+
+/**
+ * 群聊初始问候语来源：每个成员的预设消息 + 备选问候语。
+ */
+data class GroupGreetingMember(
+    val assistantId: Uuid,
+    val presetMessages: List<UIMessage>,
+    val alternateGreetings: List<String>,
+)
+
+/**
+ * 构建群聊新对话的初始问候节点。
+ *
+ * 对应 SillyTavern 群聊会展示各成员的问候语：为每个成员复用单人问候逻辑
+ * （first_mes + alternate_greetings 合并为可左右滑动的节点），仅保留其中的
+ * ASSISTANT 问候节点，并为消息打上 [UIMessage.senderId] 以便归属到对应成员
+ * （头像/名称）。没有问候语的成员会被跳过。
+ */
+fun buildGroupInitialNodes(
+    members: List<GroupGreetingMember>,
+): List<MessageNode> = members.flatMap { member ->
+    buildInitialMessageNodes(member.presetMessages, member.alternateGreetings)
+        .filter { node -> node.role == MessageRole.ASSISTANT }
+        .map { node ->
+            node.copy(messages = node.messages.map { it.copy(senderId = member.assistantId) })
+        }
 }
 
 /**
