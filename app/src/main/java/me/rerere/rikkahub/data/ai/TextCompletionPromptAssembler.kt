@@ -28,12 +28,20 @@ data class TextCompletionAssemblyInput(
 object TextCompletionPromptAssembler {
     fun assemble(input: TextCompletionAssemblyInput): String {
         val story = renderStoryString(input)
-        val history = renderHistory(input.chatHistory, input.instructPreset, input)
+        val storyInChat = input.contextPreset.storyStringPosition == STORY_STRING_POSITION_IN_CHAT && story.isNotBlank()
+        val chatHistory = if (storyInChat) {
+            insertInChatStoryString(input.chatHistory, story, input.contextPreset)
+        } else {
+            input.chatHistory
+        }
+        val history = renderHistory(chatHistory, input.instructPreset, input)
 
         return buildString {
-            append(input.instructPreset.storyStringPrefix)
-            append(story)
-            append(input.instructPreset.storyStringSuffix)
+            if (!storyInChat) {
+                append(input.instructPreset.storyStringPrefix)
+                append(story)
+                append(input.instructPreset.storyStringSuffix)
+            }
             if (input.contextPreset.chatStart.isNotBlank()) {
                 appendSeparated(input.contextPreset.chatStart)
             }
@@ -52,11 +60,15 @@ object TextCompletionPromptAssembler {
             ?: input.assistantSystemPrompt
         val values = mapOf(
             "system" to system,
+            "char" to input.characterName,
+            "user" to input.userName,
             "wiBefore" to input.worldInfoBefore.filter { it.isNotBlank() }.joinToString("\n"),
+            "loreBefore" to input.worldInfoBefore.filter { it.isNotBlank() }.joinToString("\n"),
             "description" to input.description,
             "personality" to input.personality,
             "scenario" to input.scenario,
             "wiAfter" to input.worldInfoAfter.filter { it.isNotBlank() }.joinToString("\n"),
+            "loreAfter" to input.worldInfoAfter.filter { it.isNotBlank() }.joinToString("\n"),
             "persona" to input.persona,
             "anchorBefore" to input.anchorBefore,
             "anchorAfter" to input.anchorAfter,
@@ -135,7 +147,26 @@ object TextCompletionPromptAssembler {
 
     private fun textOf(message: UIMessage): String =
         message.parts.filterIsInstance<UIMessagePart.Text>().joinToString("") { it.text }
+
+    private fun insertInChatStoryString(
+        messages: List<UIMessage>,
+        story: String,
+        contextPreset: ContextPreset,
+    ): List<UIMessage> {
+        val depth = contextPreset.storyStringDepth.coerceAtLeast(0)
+        val insertIndex = (messages.size - depth).coerceIn(0, messages.size)
+        val storyMessage = when (contextPreset.storyStringRole) {
+            STORY_STRING_ROLE_USER -> UIMessage.user(story)
+            STORY_STRING_ROLE_ASSISTANT -> UIMessage.assistant(story)
+            else -> UIMessage.system(story)
+        }
+        return messages.take(insertIndex) + storyMessage + messages.drop(insertIndex)
+    }
 }
+
+private const val STORY_STRING_POSITION_IN_CHAT = 1
+private const val STORY_STRING_ROLE_USER = 1
+private const val STORY_STRING_ROLE_ASSISTANT = 2
 
 /**
  * Minimal SillyTavern story-string evaluator for context presets.
