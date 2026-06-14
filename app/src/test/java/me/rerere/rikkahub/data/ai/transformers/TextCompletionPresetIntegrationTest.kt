@@ -1,0 +1,156 @@
+package me.rerere.rikkahub.data.ai.transformers
+
+import me.rerere.ai.core.MessageRole
+import me.rerere.ai.ui.UIMessage
+import me.rerere.ai.ui.UIMessagePart
+import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.CharacterCard
+import me.rerere.rikkahub.data.model.ContextPreset
+import me.rerere.rikkahub.data.model.InjectionPosition
+import me.rerere.rikkahub.data.model.InstructPreset
+import me.rerere.rikkahub.data.model.Lorebook
+import me.rerere.rikkahub.data.model.Persona
+import me.rerere.rikkahub.data.model.PromptInjection
+import me.rerere.rikkahub.data.model.SystemPromptPreset
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
+import org.junit.Test
+import kotlin.uuid.Uuid
+
+class TextCompletionPresetIntegrationTest {
+    private fun textOf(message: UIMessage) =
+        message.parts.filterIsInstance<UIMessagePart.Text>().joinToString("") { it.text }
+
+    private val contextPreset = ContextPreset(
+        name = "Classic Context",
+        storyString = """
+            {{#if system}}{{system}}
+            {{/if}}{{#if wiBefore}}{{wiBefore}}
+            {{/if}}{{#if description}}{{description}}
+            {{/if}}{{#if personality}}{{personality}}
+            {{/if}}{{#if scenario}}{{scenario}}
+            {{/if}}{{#if wiAfter}}{{wiAfter}}
+            {{/if}}{{#if persona}}{{persona}}
+            {{/if}}{{trim}}
+        """.trimIndent(),
+        chatStart = "[Start a new chat]",
+    )
+
+    private val instructPreset = InstructPreset(
+        name = "Alpaca",
+        inputSequence = "### Instruction:\n",
+        outputSequence = "### Response:\n",
+        namesBehavior = "always",
+    )
+
+    private val systemPromptPreset = SystemPromptPreset(
+        name = "Roleplay",
+        content = "Act as Mira.",
+        postHistory = "Stay in character.",
+    )
+
+    private val lorebook = Lorebook(
+        name = "World",
+        entries = listOf(
+            PromptInjection.RegexInjection(
+                name = "before",
+                content = "The kingdom is at war.",
+                constantActive = true,
+                position = InjectionPosition.BEFORE_SYSTEM_PROMPT,
+            ),
+            PromptInjection.RegexInjection(
+                name = "after",
+                content = "Magic is unstable.",
+                constantActive = true,
+                position = InjectionPosition.AFTER_SYSTEM_PROMPT,
+            ),
+        ),
+    )
+
+    private val persona = Persona(
+        name = "Hero",
+        description = "I am the chosen courier.",
+        enabled = true,
+    )
+
+    private val assistant = Assistant(
+        name = "Mira",
+        systemPrompt = "Fallback system prompt.",
+        contextPresetId = contextPreset.id,
+        instructPresetId = instructPreset.id,
+        systemPromptPresetId = systemPromptPreset.id,
+        characterCard = CharacterCard(
+            description = "A careful court mage.",
+            personality = "Patient and direct.",
+            scenario = "The capital is under siege.",
+        ),
+        lorebookIds = setOf(lorebook.id),
+    )
+
+    private val settings = Settings(
+        contextPresets = listOf(contextPreset),
+        instructPresets = listOf(instructPreset),
+        systemPromptPresets = listOf(systemPromptPreset),
+        lorebooks = listOf(lorebook),
+        personas = listOf(persona),
+        selectedPersonaId = persona.id,
+    )
+
+    private val incoming = listOf(
+        UIMessage.system("legacy chat-completion system prompt"),
+        UIMessage.user("Hello"),
+        UIMessage.assistant("Greetings."),
+    )
+
+    @Test
+    fun `bound text-completion presets assemble one classic prompt message`() {
+        val result = buildTextCompletionPresetMessages(assistant, settings, incoming)!!
+
+        assertEquals(1, result.size)
+        assertEquals(MessageRole.USER, result.single().role)
+
+        val prompt = textOf(result.single())
+        assertInOrder(
+            prompt,
+            "Act as Mira.",
+            "The kingdom is at war.",
+            "A careful court mage.",
+            "Patient and direct.",
+            "The capital is under siege.",
+            "Magic is unstable.",
+            "I am the chosen courier.",
+            "[Start a new chat]",
+            "### Instruction:\nHero: Hello",
+            "### Response:\nMira: Greetings.",
+            "Stay in character.",
+        )
+        assertTrue(prompt.noneOf("legacy chat-completion system prompt", "Fallback system prompt."))
+    }
+
+    @Test
+    fun `missing text-completion binding keeps legacy pipeline`() {
+        assertNull(buildTextCompletionPresetMessages(assistant.copy(contextPresetId = null), settings, incoming))
+        assertNull(buildTextCompletionPresetMessages(assistant.copy(instructPresetId = null), settings, incoming))
+    }
+
+    @Test
+    fun `dangling text-completion preset ids keep legacy pipeline`() {
+        assertNull(buildTextCompletionPresetMessages(assistant.copy(contextPresetId = Uuid.random()), settings, incoming))
+        assertNull(buildTextCompletionPresetMessages(assistant.copy(instructPresetId = Uuid.random()), settings, incoming))
+    }
+
+    private fun assertInOrder(text: String, vararg fragments: String) {
+        var cursor = -1
+        fragments.forEach { fragment ->
+            val index = text.indexOf(fragment)
+            assertTrue("Missing fragment: $fragment\n$text", index >= 0)
+            assertTrue("Out of order fragment: $fragment\n$text", index > cursor)
+            cursor = index
+        }
+    }
+
+    private fun String.noneOf(vararg fragments: String): Boolean =
+        fragments.none { contains(it) }
+}
