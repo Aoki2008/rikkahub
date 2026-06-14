@@ -397,4 +397,56 @@ class QuickMessageExecutionTest {
         assertEquals(true, plan.variablesUpdated)
         assertEquals(emptyList<String>(), plan.toastMessages)
     }
+
+    @Test
+    fun `if command executes true closure and pipes branch result`() {
+        val quickMessage = QuickMessage(
+            title = "Tea gate",
+            content = "/setvar key=drink \"black tea\" | /if left=drink right=\"black tea\" rule=eq else={: /echo denied :} {: /pass accepted :} | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("drink" to "black tea"), plan.localVariables)
+        assertEquals(listOf("accepted"), plan.toastMessages)
+        assertEquals(emptyList<String>(), plan.unsupportedCommands)
+    }
+
+    @Test
+    fun `if command executes else closure and abort stops remaining commands`() {
+        val quickMessage = QuickMessage(
+            title = "Tea gate",
+            content = "/setvar key=drink coffee | /if left=drink right=\"black tea\" rule=eq else={: /echo denied | /abort :} {: /pass accepted :} | /echo after abort",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("drink" to "coffee"), plan.localVariables)
+        assertEquals(listOf("denied"), plan.toastMessages)
+        assertEquals(emptyList<String>(), plan.unsupportedCommands)
+    }
+
+    @Test
+    fun `if command resolves variable operands before numeric comparison`() {
+        val quickMessage = QuickMessage(
+            title = "Counter gate",
+            content = "/setvar key=count 3 | /if left=count right=2 rule=gt {: /pass high :} | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(listOf("high"), plan.toastMessages)
+    }
 }

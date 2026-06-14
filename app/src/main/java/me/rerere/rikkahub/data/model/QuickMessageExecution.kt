@@ -14,6 +14,8 @@ data class QuickMessageExecutionPlan(
     val globalVariables: Map<String, String> = emptyMap(),
     val variablesUpdated: Boolean = false,
     val expressionLabel: String? = null,
+    val outputPipe: String = "",
+    val aborted: Boolean = false,
 )
 
 data class QuickMessageChatMessage(
@@ -100,19 +102,24 @@ private fun executeQuickMessageSlashCommands(
     var sendMode = QuickMessageSendMode.NONE
     var hasCompatibleCommand = false
     var hasInputUpdate = false
+    var aborted = false
     var expressionLabel: String? = null
     val unsupported = mutableListOf<String>()
     val toastMessages = mutableListOf<String>()
     val chatMessages = mutableListOf<QuickMessageChatMessage>()
 
-    for (commandText in splitSlashPipeline(input)) {
+    commandLoop@ for (commandText in splitSlashPipeline(input)) {
         val command = parseSlashCommand(commandText)
         if (command == null) {
             if (commandText.isNotBlank()) unsupported += commandText.trim()
             continue
         }
 
-        val arguments = parseSlashArguments(command.args, pipe, state)
+        val arguments = if (command.name.equals("if", ignoreCase = true)) {
+            parseIfSlashArguments(command.args, pipe, state)
+        } else {
+            parseSlashArguments(command.args, pipe, state)
+        }
         val args = arguments.unnamed
         when (command.name.lowercase()) {
             "pass" -> {
@@ -152,6 +159,48 @@ private fun executeQuickMessageSlashCommands(
             "return" -> {
                 hasCompatibleCommand = true
                 pipe = resolveSlashArgument(args, pipe)
+            }
+
+            "abort" -> {
+                hasCompatibleCommand = true
+                aborted = true
+                break@commandLoop
+            }
+
+            "if" -> {
+                hasCompatibleCommand = true
+                val branch = resolveIfBranch(arguments, state)
+                if (branch.isNotBlank()) {
+                    val branchPlan = executeQuickMessageSlashCommands(
+                        input = branch,
+                        currentInput = if (hasInputUpdate) inputText else currentInput,
+                        localVariables = state.localVariables(),
+                        globalVariables = state.globalVariables(),
+                    )
+                    if (branchPlan == null) {
+                        unsupported += "/if"
+                    } else {
+                        if (branchPlan.inputUpdated) {
+                            hasInputUpdate = true
+                            inputText = branchPlan.inputText
+                        }
+                        if (branchPlan.sendMode != QuickMessageSendMode.NONE) {
+                            sendMode = branchPlan.sendMode
+                        }
+                        unsupported += branchPlan.unsupportedCommands
+                        toastMessages += branchPlan.toastMessages
+                        chatMessages += branchPlan.chatMessages
+                        branchPlan.expressionLabel?.let { expressionLabel = it }
+                        state.replaceWith(branchPlan.localVariables, branchPlan.globalVariables)
+                        pipe = branchPlan.outputPipe
+                        if (branchPlan.aborted) {
+                            aborted = true
+                            break@commandLoop
+                        }
+                    }
+                } else {
+                    pipe = ""
+                }
             }
 
             "getvar" -> {
@@ -320,6 +369,8 @@ private fun executeQuickMessageSlashCommands(
         globalVariables = state.globalVariables(),
         variablesUpdated = state.variablesUpdated(),
         expressionLabel = expressionLabel,
+        outputPipe = pipe,
+        aborted = aborted,
     )
 }
 
@@ -344,6 +395,25 @@ private class QuickMessageVariableState(
 
     fun getGlobal(name: String): String =
         global[normalizeVariableName(name)].orEmpty()
+
+    fun getLocalOrGlobalOrNull(name: String): String? {
+        val key = normalizeVariableName(name)
+        return when {
+            local.containsKey(key) -> local[key]
+            global.containsKey(key) -> global[key]
+            else -> null
+        }
+    }
+
+    fun replaceWith(
+        localVariables: Map<String, String>,
+        globalVariables: Map<String, String>,
+    ) {
+        local.clear()
+        local.putAll(localVariables.normalizedVariableMap())
+        global.clear()
+        global.putAll(globalVariables.normalizedVariableMap())
+    }
 
     fun setLocal(name: String, value: String): String =
         set(local, name, value)
@@ -531,6 +601,7 @@ private fun splitSlashPipeline(input: String): List<String> {
     val parts = mutableListOf<String>()
     val current = StringBuilder()
     var macroDepth = 0
+    var closureDepth = 0
     var quote: Char? = null
     var escaped = false
     var index = 0
@@ -566,13 +637,25 @@ private fun splitSlashPipeline(input: String): List<String> {
                 index++
             }
 
+            char == '{' && next == ':' -> {
+                current.append("{:")
+                closureDepth++
+                index++
+            }
+
             char == '}' && next == '}' && macroDepth > 0 -> {
                 current.append("}}")
                 macroDepth--
                 index++
             }
 
-            char == '|' && macroDepth == 0 -> {
+            char == ':' && next == '}' && closureDepth > 0 -> {
+                current.append(":}")
+                closureDepth--
+                index++
+            }
+
+            char == '|' && macroDepth == 0 && closureDepth == 0 -> {
                 parts += current.toString()
                 current.clear()
             }
@@ -619,14 +702,220 @@ private fun parseSlashArguments(
     )
 }
 
-private fun stripLeadingNamedArguments(args: String): String {
-    var remaining = args.trimStart()
+private fun parseIfSlashArguments(
+    args: String,
+    pipe: String,
+    state: QuickMessageVariableState,
+): SlashArguments {
+    var index = 0
+    val named = mutableMapOf<String, String>()
 
     while (true) {
-        val match = leadingNamedArgumentRegex.find(remaining) ?: return remaining
-        remaining = remaining.substring(match.range.last + 1).trimStart()
+        index = args.skipWhitespace(index)
+        val keyStart = index
+        if (keyStart >= args.length || !args[keyStart].isLetterOrUnderscore()) break
+
+        index++
+        while (index < args.length && args[index].isSlashIdentifierPart()) {
+            index++
+        }
+
+        val key = args.substring(keyStart, index)
+        if (index >= args.length || args[index] != '=') {
+            index = keyStart
+            break
+        }
+        index++
+
+        val value = args.readSlashArgumentValue(index)
+        if (value == null) {
+            index = keyStart
+            break
+        }
+        named[key.lowercase()] = if (value.isClosure) {
+            value.value.trim()
+        } else {
+            state.expandMacros(value.value, pipe).trim()
+        }
+        index = value.nextIndex
+    }
+
+    val unnamedRaw = args.substring(index).trim()
+    val unnamed = args.readIfUnnamedArgument(index)
+        ?.let { value ->
+            if (value.isClosure) value.value.trim() else state.expandMacros(value.value, pipe).trim()
+        }
+        ?: state.expandMacros(unnamedRaw, pipe).trim()
+
+    return SlashArguments(named = named, unnamed = unnamed)
+}
+
+private data class SlashArgumentValue(
+    val value: String,
+    val nextIndex: Int,
+    val isClosure: Boolean,
+)
+
+private fun resolveIfBranch(
+    arguments: SlashArguments,
+    state: QuickMessageVariableState,
+): String {
+    val rule = arguments.named["rule"].orEmpty().ifBlank { "eq" }.lowercase()
+    val left = resolveIfOperand(arguments.named["left"].orEmpty(), state)
+    val right = resolveIfOperand(arguments.named["right"].orEmpty(), state)
+    val matched = when (rule) {
+        "eq", "equals", "==" -> left == right
+        "neq", "ne", "!=" -> left != right
+        "lt", "<" -> compareIfOperands(left, right) < 0
+        "gt", ">" -> compareIfOperands(left, right) > 0
+        "lte", "le", "<=" -> compareIfOperands(left, right) <= 0
+        "gte", "ge", ">=" -> compareIfOperands(left, right) >= 0
+        "not", "!" -> !left.isStScriptTruthy()
+        "in" -> left.contains(right, ignoreCase = true)
+        "nin" -> !left.contains(right, ignoreCase = true)
+        else -> false
+    }
+
+    return if (matched) arguments.unnamed else arguments.named["else"].orEmpty()
+}
+
+private fun resolveIfOperand(
+    value: String,
+    state: QuickMessageVariableState,
+): String {
+    val trimmed = value.trim()
+    if (trimmed.toBigDecimalOrNull() != null) return trimmed
+    return state.getLocalOrGlobalOrNull(trimmed) ?: trimmed
+}
+
+private fun compareIfOperands(left: String, right: String): Int {
+    val leftNumber = left.toBigDecimalOrNull()
+    val rightNumber = right.toBigDecimalOrNull()
+    return if (leftNumber != null && rightNumber != null) {
+        leftNumber.compareTo(rightNumber)
+    } else {
+        left.compareTo(right)
     }
 }
+
+private fun String.isStScriptTruthy(): Boolean =
+    trim().lowercase().let { value ->
+        value.isNotEmpty() && value !in setOf("0", "false", "off", "no", "null")
+    }
+
+private fun String.readIfUnnamedArgument(startIndex: Int): SlashArgumentValue? {
+    val index = skipWhitespace(startIndex)
+    if (index >= length) return null
+    return readSlashArgumentValue(index)
+        ?: SlashArgumentValue(
+            value = substring(index).trim(),
+            nextIndex = length,
+            isClosure = false,
+        )
+}
+
+private fun String.readSlashArgumentValue(startIndex: Int): SlashArgumentValue? {
+    val index = skipWhitespace(startIndex)
+    if (index >= length) return null
+
+    if (getOrNull(index) == '{' && getOrNull(index + 1) == ':') {
+        return readSlashClosureValue(index)
+    }
+
+    val quote = this[index]
+    if (quote == '"' || quote == '\'') {
+        val value = StringBuilder()
+        var escaped = false
+        var cursor = index + 1
+        while (cursor < length) {
+            val char = this[cursor]
+            when {
+                escaped -> {
+                    value.append(char)
+                    escaped = false
+                }
+
+                char == '\\' -> escaped = true
+                char == quote -> {
+                    return SlashArgumentValue(
+                        value = value.toString(),
+                        nextIndex = cursor + 1,
+                        isClosure = false,
+                    )
+                }
+
+                else -> value.append(char)
+            }
+            cursor++
+        }
+        return SlashArgumentValue(value = value.toString(), nextIndex = length, isClosure = false)
+    }
+
+    var cursor = index
+    while (cursor < length && !this[cursor].isWhitespace()) {
+        cursor++
+    }
+    return SlashArgumentValue(
+        value = substring(index, cursor).unescapeSlashArgument(),
+        nextIndex = cursor,
+        isClosure = false,
+    )
+}
+
+private fun String.readSlashClosureValue(startIndex: Int): SlashArgumentValue? {
+    var depth = 1
+    var quote: Char? = null
+    var escaped = false
+    var cursor = startIndex + 2
+    val valueStart = cursor
+
+    while (cursor < length) {
+        val char = this[cursor]
+        val next = getOrNull(cursor + 1)
+        when {
+            escaped -> escaped = false
+            char == '\\' -> escaped = true
+            quote != null -> {
+                if (char == quote) quote = null
+            }
+
+            char == '"' || char == '\'' -> quote = char
+            char == '{' && next == ':' -> {
+                depth++
+                cursor++
+            }
+
+            char == ':' && next == '}' -> {
+                depth--
+                if (depth == 0) {
+                    return SlashArgumentValue(
+                        value = substring(valueStart, cursor),
+                        nextIndex = cursor + 2,
+                        isClosure = true,
+                    )
+                }
+                cursor++
+            }
+        }
+        cursor++
+    }
+
+    return null
+}
+
+private fun String.skipWhitespace(startIndex: Int): Int {
+    var index = startIndex
+    while (index < length && this[index].isWhitespace()) {
+        index++
+    }
+    return index
+}
+
+private fun Char.isLetterOrUnderscore(): Boolean =
+    isLetter() || this == '_'
+
+private fun Char.isSlashIdentifierPart(): Boolean =
+    isLetterOrDigit() || this == '_' || this == '-'
 
 private val leadingNamedArgumentRegex =
     Regex("""^([A-Za-z_][A-Za-z0-9_-]*)=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'|(\S+))\s*""")
