@@ -107,6 +107,8 @@ import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.QuickMessageSendMode
+import me.rerere.rikkahub.data.model.buildQuickMessageExecutionPlan
 import me.rerere.rikkahub.ui.components.ui.KeepScreenOn
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionManager
 import me.rerere.rikkahub.ui.components.ui.permission.PermissionCamera
@@ -381,7 +383,8 @@ fun ChatInput(
 
                     TextInputRow(
                         state = state,
-                        onSendMessage = { sendMessage() }
+                        onSendMessage = { sendMessage() },
+                        onSendMessageWithoutAnswer = { sendMessageWithoutAnswer() },
                     )
 
                     Row(
@@ -594,6 +597,7 @@ private fun ActionIconButton(
 private fun TextInputRow(
     state: ChatInputState,
     onSendMessage: () -> Unit,
+    onSendMessageWithoutAnswer: () -> Unit,
 ) {
     val settings = LocalSettings.current
     val filesManager: FilesManager = koinInject()
@@ -705,7 +709,12 @@ private fun TextInputRow(
             },
             leadingIcon = if (quickMessages.isNotEmpty()) {
                 {
-                    QuickMessageButton(quickMessages = quickMessages, state = state)
+                    QuickMessageButton(
+                        quickMessages = quickMessages,
+                        state = state,
+                        onSendMessage = onSendMessage,
+                        onSendMessageWithoutAnswer = onSendMessageWithoutAnswer,
+                    )
                 }
             } else null,
         )
@@ -721,6 +730,8 @@ private fun TextInputRow(
 private fun QuickMessageButton(
     quickMessages: List<QuickMessage>,
     state: ChatInputState,
+    onSendMessage: () -> Unit,
+    onSendMessageWithoutAnswer: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     IconButton(
@@ -738,8 +749,17 @@ private fun QuickMessageButton(
             quickMessages.forEach { quickMessage ->
                 Surface(
                     onClick = {
-                        state.appendText(quickMessage.content)
+                        val plan = buildQuickMessageExecutionPlan(
+                            quickMessage = quickMessage,
+                            currentInput = state.textContent.text.toString(),
+                        )
+                        state.setMessageText(plan.inputText)
                         expanded = false
+                        when (plan.sendMode) {
+                            QuickMessageSendMode.NONE -> Unit
+                            QuickMessageSendMode.NORMAL -> onSendMessage()
+                            QuickMessageSendMode.WITHOUT_RESPONSE -> onSendMessageWithoutAnswer()
+                        }
                     },
                     color = Color.Transparent,
                     modifier = Modifier.fillMaxWidth(),

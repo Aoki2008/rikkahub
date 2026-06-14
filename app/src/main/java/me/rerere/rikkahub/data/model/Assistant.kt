@@ -95,6 +95,10 @@ data class QuickMessage(
     val id: Uuid = Uuid.random(),
     val title: String = "",
     val content: String = "",
+    val sourceSet: String = "", // SillyTavern Quick Reply Set name, when imported
+    val sendImmediately: Boolean = false,
+    val injectInput: Boolean = false,
+    val placeBeforeInput: Boolean = false,
 )
 
 @Serializable

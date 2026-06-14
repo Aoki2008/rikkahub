@@ -5,9 +5,11 @@ import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.parseSillyTavernQuickReplies
 import kotlin.uuid.Uuid
 
 class QuickMessagesVM(
@@ -23,6 +25,14 @@ class QuickMessagesVM(
                 content = content,
             )
         )
+    }
+
+    fun importSillyTavernQuickReplies(jsonText: String): Int {
+        val quickMessages = parseSillyTavernQuickReplies(Json.parseToJsonElement(jsonText))
+        if (quickMessages.isNotEmpty()) {
+            updateQuickMessages(settings.value.quickMessages + quickMessages)
+        }
+        return quickMessages.size
     }
 
     fun updateQuickMessage(updated: QuickMessage) {
