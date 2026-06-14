@@ -6,11 +6,20 @@ import android.provider.OpenableColumns
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.encodeToJsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.parseToJsonElement
+import me.rerere.ai.core.MessageRole
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.PromptInjection
+import me.rerere.rikkahub.data.model.SelectiveLogic
 import me.rerere.rikkahub.utils.toLocalString
 import java.time.LocalDateTime
 import kotlin.uuid.Uuid
@@ -144,62 +153,141 @@ object LorebookSerializer : ExportSerializer<Lorebook> {
 
     private fun tryImportSillyTavern(json: String, fileName: String?): Lorebook? {
         return runCatching {
-            val stLorebook = ExportSerializer.DefaultJson.decodeFromString(
-                SillyTavernLorebook.serializer(),
-                json
-            )
-            Lorebook(
-                id = Uuid.random(),
-                name = fileName ?: LocalDateTime.now().toLocalString(),
-                description = "",
-                enabled = true,
-                entries = stLorebook.entries.values.map { entry ->
-                    PromptInjection.RegexInjection(
-                        id = Uuid.random(),
-                        name = entry.comment.orEmpty().ifEmpty { entry.key.firstOrNull().orEmpty() },
-                        enabled = !entry.disable,
-                        priority = entry.order,
-                        position = mapSillyTavernPosition(entry.position),
-                        injectDepth = entry.depth,
-                        content = entry.content,
-                        keywords = entry.key,
-                        useRegex = false, // SillyTavern 格式不支持 useRegex
-                        caseSensitive = entry.caseSensitive ?: false,
-                        scanDepth = entry.scanDepth ?: 4,
-                        constantActive = entry.constant,
-                    )
-                }
-            )
+            parseSillyTavernLorebook(json, fileName)
         }.getOrNull()
-    }
-
-    private fun mapSillyTavernPosition(position: Int): InjectionPosition {
-        return when (position) {
-            0 -> InjectionPosition.BEFORE_SYSTEM_PROMPT
-            1 -> InjectionPosition.AFTER_SYSTEM_PROMPT
-            2 -> InjectionPosition.TOP_OF_CHAT
-            3 -> InjectionPosition.TOP_OF_CHAT // After Examples -> 聊天历史开头
-            4 -> InjectionPosition.AT_DEPTH    // @Depth 模式
-            else -> InjectionPosition.AFTER_SYSTEM_PROMPT
-        }
     }
 }
 
-@Serializable
-private data class SillyTavernLorebook(
-    val entries: Map<String, SillyTavernEntry> = emptyMap(),
-)
+internal fun parseSillyTavernLorebook(json: String, fileName: String?): Lorebook {
+    val root = ExportSerializer.DefaultJson.parseToJsonElement(json).jsonObjectOrNull()
+        ?: throw IllegalArgumentException("SillyTavern lorebook root must be an object")
+    val entries = root["entries"]?.let(::parseSillyTavernEntries).orEmpty()
 
-@Serializable
-private data class SillyTavernEntry(
-    val key: List<String> = emptyList(),
-    val content: String = "",
-    val comment: String? = null,
-    val constant: Boolean = false,
-    val position: Int = 0,
-    val order: Int = 100,
-    val disable: Boolean = false,
-    val depth: Int = 4,
-    val scanDepth: Int? = null,
-    val caseSensitive: Boolean? = null,
-)
+    return Lorebook(
+        id = Uuid.random(),
+        name = root.stringValue("name") ?: fileName ?: LocalDateTime.now().toLocalString(),
+        description = root.stringValue("description").orEmpty(),
+        enabled = true,
+        tokenBudget = root.intValue("token_budget", "tokenBudget") ?: 0,
+        entries = entries,
+    )
+}
+
+private fun parseSillyTavernEntries(element: JsonElement): List<PromptInjection.RegexInjection> {
+    val objects = element.jsonArrayOrNull()
+        ?.mapNotNull { it.jsonObjectOrNull() }
+        ?: element.jsonObjectOrNull()?.values?.mapNotNull { it.jsonObjectOrNull() }
+        ?: emptyList()
+
+    return objects.mapNotNull(::parseSillyTavernEntry)
+}
+
+private fun parseSillyTavernEntry(entry: JsonObject): PromptInjection.RegexInjection? {
+    val extensions = entry.objectValue("extensions")
+    val content = entry.stringValue("content") ?: return null
+    val keywords = entry.stringListValue("key", "keys")
+    val secondaryKeys = entry.stringListValue("keysecondary", "secondary_keys")
+    val selective = entry.boolValue("selective") ?: secondaryKeys.isNotEmpty()
+
+    return PromptInjection.RegexInjection(
+        id = Uuid.random(),
+        name = entry.stringValue("comment", "name").orEmpty().ifEmpty { keywords.firstOrNull().orEmpty() },
+        enabled = entry.boolValue("enabled") ?: !(entry.boolValue("disable") ?: false),
+        priority = entry.intValue("order", "insertion_order", "priority") ?: 100,
+        position = mapSillyTavernPosition(
+            entry.stringValue("position") ?: extensions?.stringValue("position")
+        ),
+        injectDepth = entry.intValue("depth") ?: extensions?.intValue("depth") ?: 4,
+        role = mapSillyTavernRole(entry.stringValue("role") ?: extensions?.stringValue("role")),
+        content = content,
+        keywords = keywords,
+        useRegex = entry.boolValue("use_regex") ?: extensions?.boolValue("use_regex") ?: false,
+        caseSensitive = entry.boolValue("caseSensitive", "case_sensitive")
+            ?: extensions?.boolValue("caseSensitive", "case_sensitive")
+            ?: false,
+        scanDepth = entry.intValue("scanDepth", "scan_depth")
+            ?: extensions?.intValue("scanDepth", "scan_depth")
+            ?: 4,
+        constantActive = entry.boolValue("constant") ?: false,
+        secondaryKeys = if (selective) secondaryKeys else emptyList(),
+        selectiveLogic = mapSillyTavernSelectiveLogic(
+            entry.intValue("selectiveLogic") ?: extensions?.intValue("selectiveLogic")
+        ),
+        matchWholeWords = entry.boolValue("matchWholeWords", "match_whole_words")
+            ?: extensions?.boolValue("matchWholeWords", "match_whole_words")
+            ?: false,
+        probability = (entry.intValue("probability") ?: extensions?.intValue("probability") ?: 100)
+            .coerceIn(0, 100),
+        useProbability = entry.boolValue("useProbability", "use_probability")
+            ?: extensions?.boolValue("useProbability", "use_probability")
+            ?: false,
+        inclusionGroup = entry.stringValue("group", "inclusion_group")
+            ?: extensions?.stringValue("group", "inclusion_group")
+            ?: "",
+        excludeRecursion = entry.boolValue("excludeRecursion", "exclude_recursion")
+            ?: extensions?.boolValue("excludeRecursion", "exclude_recursion")
+            ?: false,
+        preventRecursion = entry.boolValue("preventRecursion", "prevent_recursion")
+            ?: extensions?.boolValue("preventRecursion", "prevent_recursion")
+            ?: false,
+        delayUntilRecursion = entry.boolValue("delayUntilRecursion", "delay_until_recursion")
+            ?: extensions?.boolValue("delayUntilRecursion", "delay_until_recursion")
+            ?: false,
+    )
+}
+
+private fun mapSillyTavernPosition(position: String?): InjectionPosition = when (position) {
+    "0", "before_char" -> InjectionPosition.BEFORE_SYSTEM_PROMPT
+    "1", "after_char" -> InjectionPosition.AFTER_SYSTEM_PROMPT
+    "2" -> InjectionPosition.TOP_OF_CHAT
+    "3" -> InjectionPosition.BOTTOM_OF_CHAT
+    "4" -> InjectionPosition.AT_DEPTH
+    else -> InjectionPosition.AFTER_SYSTEM_PROMPT
+}
+
+private fun mapSillyTavernRole(role: String?): MessageRole = when (role) {
+    "2", "assistant" -> MessageRole.ASSISTANT
+    else -> MessageRole.USER
+}
+
+private fun mapSillyTavernSelectiveLogic(value: Int?): SelectiveLogic = when (value) {
+    1 -> SelectiveLogic.NOT_ALL
+    2 -> SelectiveLogic.NOT_ANY
+    3 -> SelectiveLogic.AND_ALL
+    else -> SelectiveLogic.AND_ANY
+}
+
+private fun JsonObject.objectValue(key: String): JsonObject? =
+    this[key]?.jsonObjectOrNull()
+
+private fun JsonObject.stringValue(vararg keys: String): String? =
+    keys.firstNotNullOfOrNull { key ->
+        this[key]?.let { element ->
+            runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
+        }
+    }
+
+private fun JsonObject.intValue(vararg keys: String): Int? =
+    stringValue(*keys)?.toIntOrNull()
+
+private fun JsonObject.boolValue(vararg keys: String): Boolean? =
+    keys.firstNotNullOfOrNull { key ->
+        this[key]?.let { element ->
+            runCatching { element.jsonPrimitive.booleanOrNull }.getOrNull()
+                ?: runCatching { element.jsonPrimitive.contentOrNull?.toBooleanStrictOrNull() }.getOrNull()
+        }
+    }
+
+private fun JsonObject.stringListValue(vararg keys: String): List<String> =
+    keys.firstNotNullOfOrNull { key ->
+        val element = this[key] ?: return@firstNotNullOfOrNull null
+        element.jsonArrayOrNull()
+            ?.mapNotNull { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
+            ?: runCatching { element.jsonPrimitive.contentOrNull?.let(::listOf) }.getOrNull()
+    }.orEmpty()
+
+private fun JsonElement.jsonObjectOrNull(): JsonObject? =
+    runCatching { jsonObject }.getOrNull()
+
+private fun JsonElement.jsonArrayOrNull() =
+    runCatching { jsonArray }.getOrNull()
