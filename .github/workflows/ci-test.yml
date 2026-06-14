@@ -101,12 +101,31 @@ jobs:
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload debug APK (arm64-v8a)
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: rikkahub-st-debug-apk
-          path: app/build/outputs/apk/debug/*.apk
+          name: rikkahub-st-debug-arm64-v8a-apk
+          path: app/build/outputs/apk/debug/*arm64-v8a*.apk
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload debug APK (x86_64)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rikkahub-st-debug-x86_64-apk
+          path: app/build/outputs/apk/debug/*x86_64*.apk
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Upload debug APK (universal)
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rikkahub-st-debug-universal-apk
+          path: app/build/outputs/apk/debug/*universal*.apk
+          compression-level: 0
           if-no-files-found: error
 
       - name: Upload test report
@@ -130,7 +149,7 @@ jobs:
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
-          name: rikkahub-st-debug-apk
+          name: rikkahub-st-debug-x86_64-apk
           path: apk
 
       - name: Enable KVM
