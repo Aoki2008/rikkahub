@@ -8,15 +8,28 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -29,6 +42,7 @@ import kotlinx.serialization.json.jsonObject
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.PromptPreset
 import me.rerere.rikkahub.data.model.parseSillyTavernPreset
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.theme.CustomColors
@@ -52,6 +66,8 @@ fun PromptPresetCard(
     val settingsStore: SettingsStore = koinInject()
 
     val presets = settings.promptPresets
+    val bound = presets.firstOrNull { it.id == assistant.promptPresetId }
+    var editing by remember { mutableStateOf<PromptPreset?>(null) }
 
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocument()
@@ -114,8 +130,117 @@ fun PromptPresetCard(
             ) {
                 Text("Import preset (JSON)")
             }
+
+            if (bound != null) {
+                OutlinedButton(
+                    onClick = { editing = bound },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text("Edit blocks of \"${bound.name.ifBlank { "Preset" }}\"")
+                }
+            }
         }
     }
+
+    editing?.let { current ->
+        PromptPresetEditorDialog(
+            preset = current,
+            onDismiss = { editing = null },
+            onSave = { updated ->
+                scope.launch {
+                    settingsStore.update { s ->
+                        s.copy(promptPresets = s.promptPresets.map { if (it.id == updated.id) updated else it })
+                    }
+                }
+                editing = null
+            },
+        )
+    }
+}
+
+/**
+ * 预设块编辑器：按顺序列出各块，可开关、上移/下移；文本块（非 marker）可直接编辑内容。
+ */
+@Composable
+private fun PromptPresetEditorDialog(
+    preset: PromptPreset,
+    onDismiss: () -> Unit,
+    onSave: (PromptPreset) -> Unit,
+) {
+    var draft by remember(preset.id) { mutableStateOf(preset) }
+    val blocksById = draft.prompts.associateBy { it.identifier }
+
+    fun moveOrder(index: Int, delta: Int) {
+        val target = index + delta
+        if (target !in draft.promptOrder.indices) return
+        val newOrder = draft.promptOrder.toMutableList()
+        val tmp = newOrder[index]; newOrder[index] = newOrder[target]; newOrder[target] = tmp
+        draft = draft.copy(promptOrder = newOrder)
+    }
+
+    fun toggle(index: Int, enabled: Boolean) {
+        val newOrder = draft.promptOrder.toMutableList()
+        newOrder[index] = newOrder[index].copy(enabled = enabled)
+        draft = draft.copy(promptOrder = newOrder)
+    }
+
+    fun editContent(identifier: String, content: String) {
+        draft = draft.copy(prompts = draft.prompts.map {
+            if (it.identifier == identifier) it.copy(content = content) else it
+        })
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(draft.name.ifBlank { "Preset" }) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .heightIn(max = 460.dp)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                draft.promptOrder.forEachIndexed { index, entry ->
+                    val block = blocksById[entry.identifier] ?: return@forEachIndexed
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Switch(
+                                checked = entry.enabled,
+                                onCheckedChange = { toggle(index, it) },
+                            )
+                            Text(
+                                text = block.name.ifBlank { block.identifier } +
+                                    if (block.marker) "  ·marker" else "",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            TextButton(onClick = { moveOrder(index, -1) }, enabled = index > 0) { Text("↑") }
+                            TextButton(
+                                onClick = { moveOrder(index, 1) },
+                                enabled = index < draft.promptOrder.lastIndex,
+                            ) { Text("↓") }
+                        }
+                        if (!block.marker) {
+                            OutlinedTextField(
+                                value = block.content,
+                                onValueChange = { editContent(block.identifier, it) },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 1,
+                                maxLines = 6,
+                                enabled = entry.enabled,
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(draft) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
 }
 
 private fun queryDisplayName(context: Context, uri: Uri): String {
