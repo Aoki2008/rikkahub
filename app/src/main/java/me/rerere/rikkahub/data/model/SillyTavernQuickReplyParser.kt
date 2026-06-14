@@ -39,7 +39,7 @@ private fun parseSillyTavernQuickReplyObject(json: JsonObject): List<QuickMessag
         return parseSillyTavernQuickReplySet(json)
     }
 
-    return parseSillyTavernQuickReply(json, QuickReplySetDefaults.single()).orEmpty()
+    return parseSillyTavernQuickReply(json, QuickReplySetDefaults.single())?.let(::listOf).orEmpty()
 }
 
 private fun parseSillyTavernQuickReplySet(json: JsonObject): List<QuickMessage> {
