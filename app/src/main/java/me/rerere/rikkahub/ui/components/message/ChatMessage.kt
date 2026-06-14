@@ -353,6 +353,18 @@ private fun MessagePartsBlock(
             is MessagePartBlock.ContentBlock -> key(block.index) {
                 when (val part = block.part) {
                     is UIMessagePart.Text -> {
+                        val affectScope = if (role == MessageRole.USER) {
+                            AssistantAffectScope.USER
+                        } else {
+                            AssistantAffectScope.ASSISTANT
+                        }
+                        val visualText = remember(part.text, assistant?.regexes, affectScope) {
+                            part.text.replaceRegexes(
+                                assistant = assistant,
+                                scope = affectScope,
+                                visual = true,
+                            )
+                        }
                         SelectionContainer {
                             if (role == MessageRole.USER) {
                                 Surface(
@@ -363,11 +375,7 @@ private fun MessagePartsBlock(
                                 ) {
                                     Column(modifier = Modifier.padding(8.dp)) {
                                         MarkdownBlock(
-                                            content = part.text.replaceRegexes(
-                                                assistant = assistant,
-                                                scope = AssistantAffectScope.USER,
-                                                visual = true,
-                                            ),
+                                            content = visualText,
                                             onClickCitation = handleClickCitation
                                         )
                                     }
@@ -381,22 +389,14 @@ private fun MessagePartsBlock(
                                     ) {
                                         Column(modifier = Modifier.padding(8.dp)) {
                                             MarkdownBlock(
-                                                content = part.text.replaceRegexes(
-                                                    assistant = assistant,
-                                                    scope = AssistantAffectScope.ASSISTANT,
-                                                    visual = true,
-                                                ),
+                                                content = visualText,
                                                 onClickCitation = handleClickCitation,
                                             )
                                         }
                                     }
                                 } else {
                                     MarkdownBlock(
-                                        content = part.text.replaceRegexes(
-                                            assistant = assistant,
-                                            scope = AssistantAffectScope.ASSISTANT,
-                                            visual = true,
-                                        ),
+                                        content = visualText,
                                         onClickCitation = handleClickCitation,
                                         modifier = Modifier
                                             .animateContentSize()

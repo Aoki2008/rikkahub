@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <resources>
-  <string name="about_page_github">Github</string>
+  <string name="about_page_github">GitHub</string>
   <string name="about_page_license">License</string>
   <string name="about_page_system">System</string>
   <string name="about_page_title">About</string>
@@ -1026,11 +1026,18 @@
   <string name="st_resources_import_from_file_desc">Supports JSON resources and PNG Tavern character cards</string>
   <string name="st_resources_import_section">Import</string>
   <string name="st_resources_import_success">Imported: %s</string>
+  <string name="st_resources_extension_section">SillyTavern Extension Compatibility</string>
+  <string name="st_resources_filter_all">All</string>
+  <string name="st_resources_filter_section">Search and Filter</string>
   <string name="st_resources_load_market">Load Official Asset List</string>
   <string name="st_resources_load_market_desc">Browse compatible items from SillyTavern default content</string>
   <string name="st_resources_market_loaded">Loaded %s compatible assets</string>
   <string name="st_resources_market_section">Official Assets</string>
+  <string name="st_resources_market_section_with_count">Official Assets (%1$d/%2$d)</string>
+  <string name="st_resources_open_extension_docs">Open SillyTavern Extension Docs</string>
+  <string name="st_resources_open_extension_docs_desc">Use as a compatibility reference; browser JS extensions must be mapped to native Android features</string>
   <string name="st_resources_page_title">SillyTavern Resources</string>
+  <string name="st_resources_search_placeholder">Search by name, type, or filename</string>
   <string name="skills_page_add_title">Add Skill</string>
   <string name="skills_page_delete_message">Are you sure you want to delete "%s"? This action cannot be undone.</string>
   <string name="skills_page_delete_title">Delete Skill</string>

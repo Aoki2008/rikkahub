@@ -50,6 +50,10 @@ import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.openUrl
 import me.rerere.rikkahub.utils.plus
 
+private const val PROJECT_URL = "https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity"
+private const val REPOSITORY_URL = "https://github.com/Aoki2008/rikkahub"
+private const val LICENSE_URL = "https://github.com/Aoki2008/rikkahub/blob/feat/sillytavern-parity/LICENSE"
+
 @Composable
 fun SettingAboutPage() {
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
@@ -157,21 +161,21 @@ fun SettingAboutPage() {
                         modifier = Modifier.padding(horizontal = 8.dp),
                     ) {
                         item(
-                            onClick = { context.openUrl("https://github.com/Aoki2008/rikkahub") },
+                            onClick = { context.openUrl(PROJECT_URL) },
                             leadingContent = { Icon(HugeIcons.Earth, null) },
-                            supportingContent = { Text("https://github.com/Aoki2008/rikkahub") },
+                            supportingContent = { Text(PROJECT_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_website)) },
                         )
                         item(
-                            onClick = { context.openUrl("https://github.com/Aoki2008/rikkahub") },
+                            onClick = { context.openUrl(REPOSITORY_URL) },
                             leadingContent = { Icon(HugeIcons.Github, null) },
-                            supportingContent = { Text("https://github.com/Aoki2008/rikkahub") },
+                            supportingContent = { Text(REPOSITORY_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_github)) },
                         )
                         item(
-                            onClick = { context.openUrl("https://github.com/Aoki2008/rikkahub/blob/feat/sillytavern-parity/LICENSE") },
+                            onClick = { context.openUrl(LICENSE_URL) },
                             leadingContent = { Icon(HugeIcons.File02, null) },
-                            supportingContent = { Text("https://github.com/Aoki2008/rikkahub/blob/feat/sillytavern-parity/LICENSE") },
+                            supportingContent = { Text(LICENSE_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_license)) },
                         )
                     }

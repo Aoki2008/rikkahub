@@ -8,6 +8,7 @@ import me.rerere.ai.provider.CustomHeader
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.rikkahub.data.ai.tools.LocalToolOption
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.uuid.Uuid
 
 @Serializable
@@ -140,7 +141,7 @@ fun String.replaceRegexes(
             regex.affectingScope.contains(scope)
         ) {
             try {
-                val compiledRegex = Regex(regex.findRegex)
+                val compiledRegex = AssistantRegexCompiler.compile(regex.findRegex) ?: return@fold acc
                 val result = if (!regex.requiresExpandedReplacement()) {
                     acc.replace(
                         regex = compiledRegex,
@@ -154,7 +155,6 @@ fun String.replaceRegexes(
                 // println("Regex: ${regex.findRegex} -> ${result}")
                 result
             } catch (e: Exception) {
-                e.printStackTrace()
                 // 如果正则表达式格式错误，返回原字符串
                 acc
             }
@@ -162,6 +162,131 @@ fun String.replaceRegexes(
             acc
         }
     }
+}
+
+private data class CachedAssistantRegex(val regex: Regex?)
+
+private object AssistantRegexCompiler {
+    private val cache = ConcurrentHashMap<String, CachedAssistantRegex>()
+
+    fun compile(pattern: String): Regex? =
+        cache.getOrPut(pattern) {
+            val compiled = runCatching { Regex(pattern) }
+                .recoverCatching {
+                    val normalized = normalizeRegexForJvm(pattern)
+                    if (normalized == pattern) throw it
+                    Regex(normalized)
+                }
+                .getOrNull()
+            CachedAssistantRegex(compiled)
+        }.regex
+}
+
+internal fun normalizeRegexForJvm(pattern: String): String {
+    if (pattern.isBlank()) return pattern
+
+    val output = StringBuilder(pattern.length)
+    var index = 0
+    var escaped = false
+    var inCharacterClass = false
+
+    while (index < pattern.length) {
+        val char = pattern[index]
+        when {
+            escaped -> {
+                output.append(char)
+                escaped = false
+                index++
+            }
+
+            char == '\\' -> {
+                output.append(char)
+                escaped = true
+                index++
+            }
+
+            char == '[' && !inCharacterClass -> {
+                inCharacterClass = true
+                output.append(char)
+                index++
+            }
+
+            char == ']' && inCharacterClass -> {
+                inCharacterClass = false
+                output.append(char)
+                index++
+            }
+
+            !inCharacterClass && char == '{' -> {
+                val unicodeClassEnd = findRegexClassBraceEnd(pattern, index, output)
+                if (unicodeClassEnd >= 0) {
+                    output.append(pattern, index, unicodeClassEnd + 1)
+                    index = unicodeClassEnd + 1
+                } else {
+                    val quantifierEnd = findRegexQuantifierEnd(pattern, index)
+                    if (quantifierEnd >= 0 && output.hasQuantifierTarget()) {
+                        output.append(pattern, index, quantifierEnd + 1)
+                        index = quantifierEnd + 1
+                    } else {
+                        output.append("\\{")
+                        index++
+                    }
+                }
+            }
+
+            !inCharacterClass && char == '}' -> {
+                output.append("\\}")
+                index++
+            }
+
+            else -> {
+                output.append(char)
+                index++
+            }
+        }
+    }
+
+    return output.toString()
+}
+
+private fun findRegexClassBraceEnd(pattern: String, start: Int, output: StringBuilder): Int {
+    if (!output.endsWith("\\p") && !output.endsWith("\\P") && !output.endsWith("\\x")) {
+        return -1
+    }
+    val end = pattern.indexOf('}', startIndex = start + 1)
+    return if (end > start + 1) end else -1
+}
+
+private fun findRegexQuantifierEnd(pattern: String, start: Int): Int {
+    var index = start + 1
+    if (index >= pattern.length || !pattern[index].isDigit()) return -1
+
+    while (index < pattern.length && pattern[index].isDigit()) {
+        index++
+    }
+
+    if (index < pattern.length && pattern[index] == ',') {
+        index++
+        while (index < pattern.length && pattern[index].isDigit()) {
+            index++
+        }
+    }
+
+    return if (index < pattern.length && pattern[index] == '}') index else -1
+}
+
+private fun StringBuilder.hasQuantifierTarget(): Boolean {
+    if (isEmpty()) return false
+    val last = this[length - 1]
+    return last !in setOf('(', '|', '^')
+}
+
+private fun StringBuilder.endsWith(suffix: String): Boolean {
+    if (length < suffix.length) return false
+    for (i in suffix.indices) {
+        if (this[length - suffix.length + i] != suffix[i]) return false
+    }
+    return true
 }
 
 private fun AssistantRegex.requiresExpandedReplacement(): Boolean =

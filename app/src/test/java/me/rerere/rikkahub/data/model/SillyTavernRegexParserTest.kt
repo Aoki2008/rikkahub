@@ -142,4 +142,49 @@ class SillyTavernRegexParserTest {
 
         assertEquals("dragon", result)
     }
+
+    @Test
+    fun `imported JS regex with bare closing braces compiles on JVM`() {
+        val raw = """
+            {
+              "scriptName": "Remove ST comments",
+              "findRegex": "/\\{\\{\\/\\/[\\s\\S]*?}}/g",
+              "replaceString": "",
+              "placement": [2],
+              "disabled": false
+            }
+        """.trimIndent()
+        val assistant = Assistant(regexes = parseSillyTavernRegexScripts(json.parseToJsonElement(raw)))
+
+        val result = "hello {{//hidden note}}there".replaceRegexes(
+            assistant = assistant,
+            scope = AssistantAffectScope.ASSISTANT,
+            visual = false,
+        )
+
+        assertEquals("hello there", result)
+    }
+
+    @Test
+    fun `stored JS-compatible regex with bare braces is normalized at runtime`() {
+        val assistant = Assistant(
+            regexes = listOf(
+                AssistantRegex(
+                    id = kotlin.uuid.Uuid.random(),
+                    name = "Remove ST comments",
+                    findRegex = "\\{\\{//[\\s\\S]*?}}",
+                    replaceString = "",
+                    affectingScope = setOf(AssistantAffectScope.ASSISTANT),
+                )
+            )
+        )
+
+        val result = "hello {{//hidden note}}there".replaceRegexes(
+            assistant = assistant,
+            scope = AssistantAffectScope.ASSISTANT,
+            visual = false,
+        )
+
+        assertEquals("hello there", result)
+    }
 }

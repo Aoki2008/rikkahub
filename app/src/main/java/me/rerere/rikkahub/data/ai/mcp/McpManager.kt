@@ -33,6 +33,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import me.rerere.ai.core.InputSchema
 import me.rerere.ai.ui.UIMessagePart
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.getCurrentAssistant
@@ -56,25 +57,29 @@ class McpManager(
     private val appScope: AppScope,
     private val filesManager: FilesManager,
 ) {
-    private val okHttpClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(10, TimeUnit.MINUTES)
-        .writeTimeout(120, TimeUnit.SECONDS)
-        .followSslRedirects(true)
-        .followRedirects(true)
-        .build()
+    private val okHttpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(20, TimeUnit.SECONDS)
+            .readTimeout(10, TimeUnit.MINUTES)
+            .writeTimeout(120, TimeUnit.SECONDS)
+            .followSslRedirects(true)
+            .followRedirects(true)
+            .build()
+    }
 
-    private val client = HttpClient(OkHttp) {
-        engine {
-            preconfigured = okHttpClient
+    private val client: HttpClient by lazy {
+        HttpClient(OkHttp) {
+            engine {
+                preconfigured = okHttpClient
+            }
+            install(ContentNegotiation) {
+                json(Json {
+                    prettyPrint = true
+                    isLenient = true
+                })
+            }
+            install(SSE)
         }
-        install(ContentNegotiation) {
-            json(Json {
-                prettyPrint = true
-                isLenient = true
-            })
-        }
-        install(SSE)
     }
 
     private val clients: MutableMap<McpServerConfig, Client> = mutableMapOf()
@@ -83,41 +88,45 @@ class McpManager(
     val syncingStatus = MutableStateFlow<Map<Uuid, McpStatus>>(mapOf())
 
     init {
-        appScope.launch {
-            settingsStore.settingsFlow
-                .map { settings -> settings.mcpServers }
-                .collect { mcpServerConfigs ->
-                    runCatching {
-                        Log.i(TAG, "update configs: $mcpServerConfigs")
-                        val newConfigs = mcpServerConfigs.filter { it.commonOptions.enable }
-                        val currentConfigs = clients.keys.toList()
-                        val (toAdd, toRemove) = currentConfigs.checkDifferent(
-                            other = newConfigs,
-                            eq = { a, b -> a.id == b.id }
-                        )
-                        Log.i(TAG, "to_add: $toAdd")
-                        Log.i(TAG, "to_remove: $toRemove")
-                        toAdd.forEach { cfg ->
-                            appScope.launch {
-                                runCatching { addClient(cfg) }
-                                    .onFailure { it.printStackTrace() }
+        if (AppFeatures.MCP) {
+            appScope.launch {
+                settingsStore.settingsFlow
+                    .map { settings -> settings.mcpServers }
+                    .collect { mcpServerConfigs ->
+                        runCatching {
+                            Log.i(TAG, "update configs: $mcpServerConfigs")
+                            val newConfigs = mcpServerConfigs.filter { it.commonOptions.enable }
+                            val currentConfigs = clients.keys.toList()
+                            val (toAdd, toRemove) = currentConfigs.checkDifferent(
+                                other = newConfigs,
+                                eq = { a, b -> a.id == b.id }
+                            )
+                            Log.i(TAG, "to_add: $toAdd")
+                            Log.i(TAG, "to_remove: $toRemove")
+                            toAdd.forEach { cfg ->
+                                appScope.launch {
+                                    runCatching { addClient(cfg) }
+                                        .onFailure { it.printStackTrace() }
+                                }
                             }
+                            toRemove.forEach { cfg ->
+                                appScope.launch { removeClient(cfg) }
+                            }
+                        }.onFailure {
+                            it.printStackTrace()
                         }
-                        toRemove.forEach { cfg ->
-                            appScope.launch { removeClient(cfg) }
-                        }
-                    }.onFailure {
-                        it.printStackTrace()
                     }
-                }
+            }
         }
     }
 
     fun getClient(config: McpServerConfig): Client? {
+        if (!AppFeatures.MCP) return null
         return clients.entries.find { it.key.id == config.id }?.value
     }
 
     fun getAllAvailableTools(): List<Pair<Uuid, McpTool>> {
+        if (!AppFeatures.MCP) return emptyList()
         val settings = settingsStore.settingsFlow.value
         val assistant = settings.getCurrentAssistant()
         return settings.mcpServers
@@ -132,6 +141,9 @@ class McpManager(
     }
 
     suspend fun callTool(serverId: Uuid, toolName: String, args: JsonObject): List<UIMessagePart> {
+        if (!AppFeatures.MCP) {
+            return listOf(UIMessagePart.Text("MCP is disabled in this build"))
+        }
         val entry = clients.entries.find { it.key.id == serverId }
         val client = entry?.value
             ?: return listOf(UIMessagePart.Text("Failed to execute tool, because no such mcp client for the tool"))
@@ -202,6 +214,7 @@ class McpManager(
     }
 
     suspend fun addClient(config: McpServerConfig) = withContext(Dispatchers.IO) {
+        if (!AppFeatures.MCP) return@withContext
         removeClient(config) // Remove first
         cancelReconnect(config.id)
         reconnectAttempts[config.id] = 0
@@ -313,6 +326,7 @@ class McpManager(
     }
 
     suspend fun syncAll() = withContext(Dispatchers.IO) {
+        if (!AppFeatures.MCP) return@withContext
         clients.keys.toList().forEach { config ->
             runCatching {
                 sync(config)

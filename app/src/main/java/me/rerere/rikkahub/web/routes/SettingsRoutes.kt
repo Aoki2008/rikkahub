@@ -10,6 +10,7 @@ import io.ktor.server.sse.heartbeat
 import io.ktor.server.sse.sse
 import me.rerere.ai.provider.BuiltInTools
 import me.rerere.ai.provider.ModelType
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.datastore.findModelById
 import me.rerere.rikkahub.utils.JsonInstant
@@ -72,23 +73,25 @@ fun Route.settingsRoutes(
             call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
         }
 
-        post("/assistant/mcp") {
-            val request = call.receive<UpdateAssistantMcpServersRequest>()
-            val assistantId = request.assistantId.toUuid("assistantId")
+        if (AppFeatures.MCP) {
+            post("/assistant/mcp") {
+                val request = call.receive<UpdateAssistantMcpServersRequest>()
+                val assistantId = request.assistantId.toUuid("assistantId")
 
-            val settings = settingsStore.settingsFlow.value
-            if (settings.assistants.none { it.id == assistantId }) {
-                throw NotFoundException("Assistant not found")
+                val settings = settingsStore.settingsFlow.value
+                if (settings.assistants.none { it.id == assistantId }) {
+                    throw NotFoundException("Assistant not found")
+                }
+
+                val validServerIds = settings.mcpServers.map { it.id }.toSet()
+                val requestedServerIds = request.mcpServerIds.map { it.toUuid("mcpServerIds") }.toSet()
+                if (!validServerIds.containsAll(requestedServerIds)) {
+                    throw BadRequestException("mcpServerIds contains unknown server id")
+                }
+
+                settingsStore.updateAssistantMcpServers(assistantId, requestedServerIds)
+                call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
             }
-
-            val validServerIds = settings.mcpServers.map { it.id }.toSet()
-            val requestedServerIds = request.mcpServerIds.map { it.toUuid("mcpServerIds") }.toSet()
-            if (!validServerIds.containsAll(requestedServerIds)) {
-                throw BadRequestException("mcpServerIds contains unknown server id")
-            }
-
-            settingsStore.updateAssistantMcpServers(assistantId, requestedServerIds)
-            call.respond(HttpStatusCode.OK, mapOf("status" to "ok"))
         }
 
         post("/assistant/injections") {

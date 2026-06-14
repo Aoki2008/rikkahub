@@ -39,6 +39,8 @@ data class SillyTavernResourcesUiState(
     val loading: Boolean = false,
     val importingAsset: String? = null,
     val assets: List<SillyTavernMarketAsset> = emptyList(),
+    val searchQuery: String = "",
+    val selectedType: String? = null,
 )
 
 data class SillyTavernImportReport(
@@ -68,6 +70,14 @@ class SillyTavernResourcesVM(
 
     private val _uiState = MutableStateFlow(SillyTavernResourcesUiState())
     val uiState = _uiState.asStateFlow()
+
+    fun updateSearchQuery(query: String) {
+        _uiState.update { it.copy(searchQuery = query) }
+    }
+
+    fun updateSelectedType(type: String?) {
+        _uiState.update { it.copy(selectedType = type) }
+    }
 
     fun importFromFile(
         context: Context,
@@ -113,7 +123,7 @@ class SillyTavernResourcesVM(
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    onResult(false, e.message ?: "Unknown error")
+                    onResult(false, "${e.message ?: "Unknown error"}; check GitHub access or proxy/VPN")
                 }
             } finally {
                 _uiState.update { it.copy(loading = false) }
@@ -246,12 +256,12 @@ class SillyTavernResourcesVM(
     private suspend fun applyResources(resources: SillyTavernResourceImport) {
         settingsStore.update { settings ->
             settings.copy(
-                promptPresets = settings.promptPresets + resources.promptPresets,
-                contextPresets = settings.contextPresets + resources.contextPresets,
-                instructPresets = settings.instructPresets + resources.instructPresets,
-                systemPromptPresets = settings.systemPromptPresets + resources.systemPromptPresets,
-                lorebooks = settings.lorebooks + resources.lorebooks,
-                quickMessages = settings.quickMessages + resources.quickMessages,
+                promptPresets = settings.promptPresets.mergeDistinctByName(resources.promptPresets) { it.name },
+                contextPresets = settings.contextPresets.mergeDistinctByName(resources.contextPresets) { it.name },
+                instructPresets = settings.instructPresets.mergeDistinctByName(resources.instructPresets) { it.name },
+                systemPromptPresets = settings.systemPromptPresets.mergeDistinctByName(resources.systemPromptPresets) { it.name },
+                lorebooks = settings.lorebooks.mergeDistinctByName(resources.lorebooks) { it.name },
+                quickMessages = settings.quickMessages.mergeDistinctQuickMessages(resources.quickMessages),
                 assistants = if (resources.regexes.isEmpty()) {
                     settings.assistants
                 } else {
@@ -286,6 +296,35 @@ class SillyTavernResourcesVM(
         }
     }
 }
+
+private fun <T> List<T>.mergeDistinctByName(
+    incoming: List<T>,
+    nameOf: (T) -> String,
+): List<T> =
+    incoming.fold(this) { acc, item ->
+        val name = nameOf(item).trim()
+        if (name.isNotEmpty() && acc.any { existing -> nameOf(existing).trim().equals(name, ignoreCase = true) }) {
+            acc
+        } else {
+            acc + item
+        }
+    }
+
+private fun List<me.rerere.rikkahub.data.model.QuickMessage>.mergeDistinctQuickMessages(
+    incoming: List<me.rerere.rikkahub.data.model.QuickMessage>,
+): List<me.rerere.rikkahub.data.model.QuickMessage> =
+    incoming.fold(this) { acc, item ->
+        if (acc.any { existing ->
+                existing.sourceSet.equals(item.sourceSet, ignoreCase = true) &&
+                    existing.title.equals(item.title, ignoreCase = true) &&
+                    existing.content == item.content
+            }
+        ) {
+            acc
+        } else {
+            acc + item
+        }
+    }
 
 private fun JsonObject.stringValue(key: String): String? =
     this[key]?.let { element ->

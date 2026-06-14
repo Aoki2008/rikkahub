@@ -81,7 +81,7 @@ private fun List<Int>.toAssistantRegexScopes(): Set<AssistantAffectScope> =
     }
 
 private fun normalizeSillyTavernFindRegex(value: String): String {
-    val literal = parseJavaScriptRegexLiteral(value.trim()) ?: return value.trim()
+    val literal = parseJavaScriptRegexLiteral(value.trim()) ?: return normalizeRegexForJvm(value.trim())
     val kotlinFlags = buildString {
         if ('i' in literal.flags) append('i')
         if ('m' in literal.flags) append('m')
@@ -89,10 +89,11 @@ private fun normalizeSillyTavernFindRegex(value: String): String {
         if ('x' in literal.flags) append('x')
         if ('U' in literal.flags) append('U')
     }
+    val pattern = normalizeRegexForJvm(literal.pattern)
     return if (kotlinFlags.isBlank()) {
-        literal.pattern
+        pattern
     } else {
-        "(?$kotlinFlags)${literal.pattern}"
+        "(?$kotlinFlags)$pattern"
     }
 }
 

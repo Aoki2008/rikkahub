@@ -5,19 +5,25 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
@@ -34,6 +40,7 @@ import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
 import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.theme.CustomColors
+import me.rerere.rikkahub.utils.openUrl
 import me.rerere.rikkahub.utils.plus
 import org.koin.androidx.compose.koinViewModel
 
@@ -45,6 +52,21 @@ fun SillyTavernResourcesPage(
     val toaster = LocalToaster.current
     val uiState by vm.uiState.collectAsStateWithLifecycle()
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    val assetTypes = remember(uiState.assets) {
+        uiState.assets.map { it.type }.distinct().sorted()
+    }
+    val filteredAssets = remember(uiState.assets, uiState.searchQuery, uiState.selectedType) {
+        val query = uiState.searchQuery.trim()
+        uiState.assets.asSequence()
+            .filter { asset -> uiState.selectedType == null || asset.type == uiState.selectedType }
+            .filter { asset ->
+                query.isBlank() ||
+                    asset.displayName.contains(query, ignoreCase = true) ||
+                    asset.type.contains(query, ignoreCase = true) ||
+                    asset.filename.contains(query, ignoreCase = true)
+            }
+            .toList()
+    }
     val fileImportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -120,16 +142,64 @@ fun SillyTavernResourcesPage(
                 }
             }
 
+            item {
+                ExtensionCompatibilitySection(
+                    onOpenDocs = {
+                        context.openUrl("https://docs.sillytavern.app/extensions/")
+                    },
+                )
+            }
+
             if (uiState.assets.isNotEmpty()) {
                 item {
+                    CardGroup(
+                        title = { Text(stringResource(R.string.st_resources_filter_section)) },
+                    ) {
+                        item {
+                            OutlinedTextField(
+                                value = uiState.searchQuery,
+                                onValueChange = vm::updateSearchQuery,
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                placeholder = { Text(stringResource(R.string.st_resources_search_placeholder)) },
+                            )
+                        }
+                        item {
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                contentPadding = PaddingValues(horizontal = 4.dp),
+                            ) {
+                                item {
+                                    FilterChip(
+                                        selected = uiState.selectedType == null,
+                                        onClick = { vm.updateSelectedType(null) },
+                                        label = { Text(stringResource(R.string.st_resources_filter_all)) },
+                                    )
+                                }
+                                items(assetTypes, key = { it }) { type ->
+                                    FilterChip(
+                                        selected = uiState.selectedType == type,
+                                        onClick = { vm.updateSelectedType(type) },
+                                        label = { Text(type) },
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                item {
                     Text(
-                        text = stringResource(R.string.st_resources_market_section),
+                        text = stringResource(
+                            R.string.st_resources_market_section_with_count,
+                            filteredAssets.size,
+                            uiState.assets.size,
+                        ),
                         style = MaterialTheme.typography.titleSmallEmphasized,
                         color = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 8.dp),
                     )
                 }
-                items(uiState.assets, key = { it.filename }) { asset ->
+                items(filteredAssets, key = { it.filename }) { asset ->
                     SillyTavernMarketAssetItem(
                         asset = asset,
                         importing = uiState.importingAsset == asset.filename,
@@ -147,6 +217,92 @@ fun SillyTavernResourcesPage(
                     )
                 }
             }
+        }
+    }
+}
+
+@Immutable
+private data class SillyTavernExtensionCompat(
+    val name: String,
+    val status: SillyTavernExtensionStatus,
+    val description: String,
+)
+
+private enum class SillyTavernExtensionStatus(val label: String) {
+    Native("Native"),
+    Partial("Partial"),
+    Unsupported("Unsupported"),
+}
+
+private val SillyTavernExtensionCatalog = listOf(
+    SillyTavernExtensionCompat(
+        name = "World Info / Lorebooks",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Imported as native lorebooks with priority, depth, constant, probability, and group rules.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Quick Replies",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Imported as quick messages. STScript slash-command coverage is being expanded natively.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Regex Scripts",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Runs on user/assistant text with JS regex compatibility normalization.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Prompt Presets",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Chat Completion and Text Completion presets bind into the prompt manager.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Author's Note / Depth Prompt",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Character-card depth prompts import as native depth injections.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Sprites, Expressions, TTS",
+        status = SillyTavernExtensionStatus.Partial,
+        description = "Data can be carried by cards, but runtime UX needs Android-native controls instead of browser panels.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Third-party browser JS extensions",
+        status = SillyTavernExtensionStatus.Unsupported,
+        description = "SillyTavern web extensions cannot be executed directly inside this native client.",
+    ),
+)
+
+@Composable
+private fun ExtensionCompatibilitySection(
+    onOpenDocs: () -> Unit,
+) {
+    CardGroup(
+        title = { Text(stringResource(R.string.st_resources_extension_section)) },
+    ) {
+        item(
+            onClick = onOpenDocs,
+            leadingContent = { Icon(HugeIcons.Puzzle, null) },
+            headlineContent = { Text(stringResource(R.string.st_resources_open_extension_docs)) },
+            supportingContent = { Text(stringResource(R.string.st_resources_open_extension_docs_desc)) },
+        )
+        SillyTavernExtensionCatalog.forEach { extension ->
+            item(
+                leadingContent = { Icon(HugeIcons.Puzzle, null) },
+                headlineContent = { Text(extension.name) },
+                supportingContent = { Text(extension.description) },
+                trailingContent = {
+                    val color = when (extension.status) {
+                        SillyTavernExtensionStatus.Native -> MaterialTheme.colorScheme.primary
+                        SillyTavernExtensionStatus.Partial -> MaterialTheme.colorScheme.tertiary
+                        SillyTavernExtensionStatus.Unsupported -> MaterialTheme.colorScheme.outline
+                    }
+                    Text(
+                        text = extension.status.label,
+                        color = color,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                },
+            )
         }
     }
 }
