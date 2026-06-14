@@ -259,7 +259,7 @@ private const val STORY_STRING_ROLE_ASSISTANT = 2
  * - {{trim}} marker (removed; final caller trims)
  */
 internal fun renderSillyTavernTemplate(template: String, values: Map<String, String>): String {
-    var result = Regex("""\{\{#if\s+([A-Za-z0-9_]+)}}(.*?)\{\{/if}}""", RegexOption.DOT_MATCHES_ALL)
+    var result = SILLY_TAVERN_IF_BLOCK_REGEX
         .replace(template) { match ->
             val key = match.groupValues[1]
             val body = match.groupValues[2]
@@ -270,3 +270,6 @@ internal fun renderSillyTavernTemplate(template: String, values: Map<String, Str
     }
     return result.replace("{{trim}}", "")
 }
+
+private val SILLY_TAVERN_IF_BLOCK_REGEX =
+    Regex("""\{\{#if\s+([A-Za-z0-9_]+)\}\}(.*?)\{\{/if\}\}""", RegexOption.DOT_MATCHES_ALL)

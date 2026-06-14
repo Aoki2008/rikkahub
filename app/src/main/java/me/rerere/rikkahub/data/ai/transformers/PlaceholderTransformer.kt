@@ -230,14 +230,14 @@ internal fun expandParametricMacros(input: String): String {
     var result = input
 
     // 注释：{{// ...}} 与 {{comment ...}}
-    result = Regex("""\{\{//[\s\S]*?}}""").replace(result, "")
-    result = Regex("""\{\{comment[\s\S]*?}}""", RegexOption.IGNORE_CASE).replace(result, "")
+    result = SILLY_TAVERN_SLASH_COMMENT_REGEX.replace(result, "")
+    result = SILLY_TAVERN_COMMENT_REGEX.replace(result, "")
 
     // {{newline}}
-    result = Regex("""\{\{newline}}""", RegexOption.IGNORE_CASE).replace(result, "\n")
+    result = SILLY_TAVERN_NEWLINE_REGEX.replace(result, "\n")
 
     // {{random:...}} 与 {{pick:...}}
-    result = Regex("""\{\{(random|pick):+(.*?)}}""", RegexOption.IGNORE_CASE).replace(result) { match ->
+    result = SILLY_TAVERN_RANDOM_PICK_REGEX.replace(result) { match ->
         val raw = match.groupValues[2]
         val options = if (raw.contains("::")) {
             raw.split("::")
@@ -248,12 +248,18 @@ internal fun expandParametricMacros(input: String): String {
     }
 
     // {{roll:NdM}} / {{roll:N}} / {{roll:dM}}
-    result = Regex("""\{\{roll[:](.*?)}}""", RegexOption.IGNORE_CASE).replace(result) { match ->
+    result = SILLY_TAVERN_ROLL_REGEX.replace(result) { match ->
         rollDice(match.groupValues[1].trim()).toString()
     }
 
     return result
 }
+
+private val SILLY_TAVERN_SLASH_COMMENT_REGEX = Regex("""\{\{//[\s\S]*?\}\}""")
+private val SILLY_TAVERN_COMMENT_REGEX = Regex("""\{\{comment[\s\S]*?\}\}""", RegexOption.IGNORE_CASE)
+private val SILLY_TAVERN_NEWLINE_REGEX = Regex("""\{\{newline\}\}""", RegexOption.IGNORE_CASE)
+private val SILLY_TAVERN_RANDOM_PICK_REGEX = Regex("""\{\{(random|pick):+(.*?)\}\}""", RegexOption.IGNORE_CASE)
+private val SILLY_TAVERN_ROLL_REGEX = Regex("""\{\{roll:(.*?)\}\}""", RegexOption.IGNORE_CASE)
 
 private fun rollDice(spec: String): Int {
     val cleaned = spec.removePrefix("d").let { if (spec.startsWith("d", ignoreCase = true)) "1d$it" else spec }

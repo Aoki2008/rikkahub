@@ -19,6 +19,14 @@ class ParametricMacroTest {
     }
 
     @Test
+    fun `slash comment macro can span lines`() {
+        assertEquals(
+            "beforeafter",
+            expandParametricMacros("before{{// hidden\nmulti-line\nnote}}after")
+        )
+    }
+
+    @Test
     fun `random picks one of the comma options`() {
         val options = setOf("alpha", "beta", "gamma")
         repeat(20) {
