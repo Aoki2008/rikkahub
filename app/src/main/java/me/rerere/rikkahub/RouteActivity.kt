@@ -370,8 +370,10 @@ class RouteActivity : ComponentActivity() {
                                 AssistantExtensionsPage(key.id)
                             }
 
-                            entry<Screen.Translator> {
-                                TranslatorPage()
+                            if (AppFeatures.TRANSLATOR) {
+                                entry<Screen.Translator> {
+                                    TranslatorPage()
+                                }
                             }
 
                             entry<Screen.Setting> {
@@ -382,8 +384,10 @@ class RouteActivity : ComponentActivity() {
                                 BackupPage()
                             }
 
-                            entry<Screen.ImageGen> {
-                                ImageGenPage()
+                            if (AppFeatures.IMAGE_GENERATION) {
+                                entry<Screen.ImageGen> {
+                                    ImageGenPage()
+                                }
                             }
 
                             entry<Screen.WebView> { key ->
@@ -458,8 +462,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingFilesPage()
                             }
 
-                            entry<Screen.SettingWeb> {
-                                SettingWebPage()
+                            if (AppFeatures.WEB_SERVER) {
+                                entry<Screen.SettingWeb> {
+                                    SettingWebPage()
+                                }
                             }
 
                             entry<Screen.Developer> {
@@ -504,8 +510,10 @@ class RouteActivity : ComponentActivity() {
                                 SearchPage()
                             }
 
-                            entry<Screen.Stats> {
-                                StatsPage()
+                            if (AppFeatures.STATS) {
+                                entry<Screen.Stats> {
+                                    StatsPage()
+                                }
                             }
                         }
                     )

@@ -8,7 +8,6 @@ on:
   push:
     branches:
       - main
-      - feat/sillytavern-parity
     paths:
       - '.github/smoke.sh'
       - '.github/workflows/ci-test.yml'

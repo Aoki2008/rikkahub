@@ -7,11 +7,14 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.MaterialTheme
@@ -37,6 +40,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import me.rerere.ai.provider.ModelType
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.ui.components.ai.ModelSelector
 import me.rerere.rikkahub.ui.components.ai.ReasoningButton
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -193,6 +197,66 @@ internal fun AssistantBasicContent(
                     )
                 }
             )
+        }
+
+        if (assistant.expressionSprites.isNotEmpty()) {
+            Card(
+                colors = CustomColors.cardColorsOnSurfaceContainer
+            ) {
+                FormItem(
+                    modifier = Modifier.padding(8.dp),
+                    label = {
+                        Text(stringResource(R.string.assistant_page_expression_sprites))
+                    },
+                    description = {
+                        Text(
+                            stringResource(
+                                R.string.assistant_page_expression_sprites_desc,
+                                assistant.expressionSprites.size,
+                            )
+                        )
+                    },
+                ) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        item("default-avatar") {
+                            FilterChip(
+                                selected = assistant.selectedExpression == null,
+                                onClick = {
+                                    onUpdate(assistant.copy(selectedExpression = null))
+                                },
+                                label = { Text(stringResource(R.string.assistant_page_expression_default)) },
+                            )
+                        }
+                        items(
+                            items = assistant.expressionSprites,
+                            key = { sprite -> sprite.imageUrl },
+                        ) { sprite ->
+                            FilterChip(
+                                selected = assistant.selectedExpression.equals(sprite.label, ignoreCase = true),
+                                onClick = {
+                                    onUpdate(
+                                        assistant.copy(
+                                            selectedExpression = sprite.label,
+                                            useAssistantAvatar = true,
+                                        )
+                                    )
+                                },
+                                leadingIcon = {
+                                    UIAvatar(
+                                        name = sprite.label,
+                                        value = Avatar.Image(sprite.imageUrl),
+                                        modifier = Modifier.size(24.dp),
+                                    )
+                                },
+                                label = { Text(sprite.label) },
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         Card(

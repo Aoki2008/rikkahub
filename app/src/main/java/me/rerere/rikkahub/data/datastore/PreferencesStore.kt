@@ -21,6 +21,7 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.core.ReasoningLevel
 import me.rerere.ai.provider.Model
 import me.rerere.ai.provider.ProviderSetting
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.AppScope
 import me.rerere.rikkahub.data.ai.mcp.McpServerConfig
 import me.rerere.rikkahub.data.ai.prompts.DEFAULT_COMPRESS_PROMPT
@@ -335,7 +336,11 @@ class SettingsStore(
         }
         .map { settings ->
             // 去重并清理无效引用
-            val validMcpServerIds = settings.mcpServers.map { it.id }.toSet()
+            val validMcpServerIds = if (AppFeatures.MCP) {
+                settings.mcpServers.map { it.id }.toSet()
+            } else {
+                emptySet()
+            }
             val validModeInjectionIds = settings.modeInjections.map { it.id }.toSet()
             val validLorebookIds = settings.lorebooks.map { it.id }.toSet()
             val validQuickMessageIds = settings.quickMessages.map { it.id }.toSet()
@@ -366,6 +371,11 @@ class SettingsStore(
                         mcpServers = assistant.mcpServers.filter { serverId ->
                             serverId in validMcpServerIds
                         }.toSet(),
+                        enabledSkills = if (AppFeatures.AGENT_SKILLS) {
+                            assistant.enabledSkills
+                        } else {
+                            emptySet()
+                        },
                         // 过滤掉不存在的模式注入 ID
                         modeInjectionIds = assistant.modeInjectionIds.filter { id ->
                             id in validModeInjectionIds
@@ -393,6 +403,12 @@ class SettingsStore(
                     )
                 },
                 ttsProviders = settings.ttsProviders.distinctBy { it.id },
+                mcpServers = if (AppFeatures.MCP) {
+                    settings.mcpServers.distinctBy { it.id }
+                } else {
+                    emptyList()
+                },
+                webServerEnabled = AppFeatures.WEB_SERVER && settings.webServerEnabled,
                 asrProviders = asrProviders,
                 selectedASRProviderId = settings.selectedASRProviderId
                     ?.takeIf { id -> asrProviders.any { provider -> provider.id == id } }
@@ -469,7 +485,9 @@ class SettingsStore(
             preferences[SEARCH_COMMON] = JsonInstant.encodeToString(settings.searchCommonOptions)
             preferences[SEARCH_SELECTED] = settings.searchServiceSelected.coerceIn(0, settings.searchServices.size - 1)
 
-            preferences[MCP_SERVERS] = JsonInstant.encodeToString(settings.mcpServers)
+            preferences[MCP_SERVERS] = JsonInstant.encodeToString(
+                if (AppFeatures.MCP) settings.mcpServers else emptyList()
+            )
             preferences[WEBDAV_CONFIG] = JsonInstant.encodeToString(settings.webDavConfig)
             preferences[S3_CONFIG] = JsonInstant.encodeToString(settings.s3Config)
             preferences[TTS_PROVIDERS] = JsonInstant.encodeToString(settings.ttsProviders)
@@ -497,7 +515,7 @@ class SettingsStore(
             settings.selectedGroupId?.let {
                 preferences[SELECTED_GROUP] = it.toString()
             } ?: preferences.remove(SELECTED_GROUP)
-            preferences[WEB_SERVER_ENABLED] = settings.webServerEnabled
+            preferences[WEB_SERVER_ENABLED] = AppFeatures.WEB_SERVER && settings.webServerEnabled
             preferences[WEB_SERVER_PORT] = settings.webServerPort
             preferences[WEB_SERVER_JWT_ENABLED] = settings.webServerJwtEnabled
             preferences[WEB_SERVER_ACCESS_PASSWORD] = settings.webServerAccessPassword

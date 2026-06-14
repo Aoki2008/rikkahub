@@ -110,12 +110,13 @@ class SillyTavernResourceImporterTest {
               {"filename": "presets/context/Llama 3 Instruct.json", "type": "context"},
               {"filename": "presets/instruct/ChatML.json", "type": "instruct"},
               {"filename": "presets/reasoning/Think XML.json", "type": "reasoning"},
-              {"filename": "default_Seraphina.png", "type": "character"}
+              {"filename": "default_Seraphina.png", "type": "character"},
+              {"filename": "Seraphina", "type": "sprites"}
             ]
             """.trimIndent()
         )
 
-        assertEquals(9, assets.size)
+        assertEquals(10, assets.size)
         assertEquals(
             listOf(
                 "world",
@@ -127,12 +128,52 @@ class SillyTavernResourceImporterTest {
                 "instruct",
                 "reasoning",
                 "character",
+                "sprites",
             ),
             assets.map { it.type },
         )
-        assertTrue(assets.last().downloadUrl.endsWith("default_Seraphina.png"))
+        assertTrue(assets[8].downloadUrl.endsWith("default_Seraphina.png"))
         assertTrue(assets[1].downloadUrl.contains("presets/openai/Default.json"))
         assertTrue(assets[5].downloadUrl.contains("Llama%203%20Instruct.json"))
         assertTrue(assets[7].downloadUrl.contains("Think%20XML.json"))
+        assertEquals(
+            "https://api.github.com/repos/SillyTavern/SillyTavern/contents/default/content/Seraphina?ref=release",
+            sillyTavernSpritesDirectoryApiUrl(assets.last().filename),
+        )
+    }
+
+    @Test
+    fun `parse SillyTavern sprite directory keeps image files`() {
+        val sprites = parseSillyTavernSpriteFiles(
+            """
+            [
+              {
+                "name": "joy.png",
+                "type": "file",
+                "download_url": "https://example.com/joy.png"
+              },
+              {
+                "name": "neutral.png",
+                "type": "file",
+                "download_url": "https://example.com/neutral.png"
+              },
+              {
+                "name": "notes.txt",
+                "type": "file",
+                "download_url": "https://example.com/notes.txt"
+              },
+              {
+                "name": "nested",
+                "type": "dir",
+                "download_url": null
+              }
+            ]
+            """.trimIndent()
+        )
+
+        assertEquals(2, sprites.size)
+        assertEquals("neutral", sprites.first().label)
+        assertEquals("neutral.png", sprites.first().fileName)
+        assertEquals("https://example.com/joy.png", sprites[1].downloadUrl)
     }
 }

@@ -62,6 +62,7 @@ import me.rerere.hugeicons.stroke.Settings03
 import me.rerere.hugeicons.stroke.Sparkles
 import me.rerere.hugeicons.stroke.TransactionHistory
 import me.rerere.rikkahub.R
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
@@ -295,38 +296,44 @@ fun ChatDrawerContent(
                     },
                 )
 
-                Box {
-                    DrawerAction(
-                        icon = {
-                            Icon(HugeIcons.Sparkles, "Menu")
-                        },
-                        label = {
-                            Text(stringResource(R.string.menu))
-                        },
-                        onClick = {
-                            showMenuPopup = true
-                        },
-                    )
-                    DropdownMenu(
-                        expanded = showMenuPopup,
-                        onDismissRequest = { showMenuPopup = false }
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_page_menu_ai_translator)) },
-                            leadingIcon = { Icon(HugeIcons.LanguageCircle, null) },
+                if (AppFeatures.TRANSLATOR || AppFeatures.IMAGE_GENERATION) {
+                    Box {
+                        DrawerAction(
+                            icon = {
+                                Icon(HugeIcons.Sparkles, "Menu")
+                            },
+                            label = {
+                                Text(stringResource(R.string.menu))
+                            },
                             onClick = {
-                                showMenuPopup = false
-                                navController.navigate(Screen.Translator)
-                            }
+                                showMenuPopup = true
+                            },
                         )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.chat_page_menu_image_generation)) },
-                            leadingIcon = { Icon(HugeIcons.Image02, null) },
-                            onClick = {
-                                showMenuPopup = false
-                                navController.navigate(Screen.ImageGen)
+                        DropdownMenu(
+                            expanded = showMenuPopup,
+                            onDismissRequest = { showMenuPopup = false }
+                        ) {
+                            if (AppFeatures.TRANSLATOR) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.chat_page_menu_ai_translator)) },
+                                    leadingIcon = { Icon(HugeIcons.LanguageCircle, null) },
+                                    onClick = {
+                                        showMenuPopup = false
+                                        navController.navigate(Screen.Translator)
+                                    }
+                                )
                             }
-                        )
+                            if (AppFeatures.IMAGE_GENERATION) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.chat_page_menu_image_generation)) },
+                                    leadingIcon = { Icon(HugeIcons.Image02, null) },
+                                    onClick = {
+                                        showMenuPopup = false
+                                        navController.navigate(Screen.ImageGen)
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -342,17 +349,19 @@ fun ChatDrawerContent(
                     },
                 )
 
-                DrawerAction(
-                    icon = {
-                        Icon(HugeIcons.ChartColumn, "统计数据")
-                    },
-                    label = {
-                        Text("统计数据")
-                    },
-                    onClick = {
-                        navController.navigate(Screen.Stats)
-                    },
-                )
+                if (AppFeatures.STATS) {
+                    DrawerAction(
+                        icon = {
+                            Icon(HugeIcons.ChartColumn, "统计数据")
+                        },
+                        label = {
+                            Text("统计数据")
+                        },
+                        onClick = {
+                            navController.navigate(Screen.Stats)
+                        },
+                    )
+                }
 
                 Spacer(Modifier.weight(1f))
 

@@ -14,6 +14,9 @@ import me.rerere.rikkahub.data.export.parseSillyTavernLorebook
 private const val SILLY_TAVERN_CONTENT_BASE_URL =
     "https://raw.githubusercontent.com/SillyTavern/SillyTavern/release/default/content"
 
+private const val SILLY_TAVERN_CONTENTS_API_BASE_URL =
+    "https://api.github.com/repos/SillyTavern/SillyTavern/contents/default/content"
+
 private val ResourceJson = Json {
     ignoreUnknownKeys = true
 }
@@ -60,6 +63,12 @@ data class SillyTavernMarketAsset(
     val downloadUrl: String,
 )
 
+data class SillyTavernSpriteFile(
+    val label: String,
+    val fileName: String,
+    val downloadUrl: String,
+)
+
 fun parseSillyTavernResources(
     jsonText: String,
     fallbackName: String,
@@ -76,6 +85,21 @@ fun parseSillyTavernContentIndex(jsonText: String): List<SillyTavernMarketAsset>
         .mapNotNull { it.asObjectOrNull() }
         .mapNotNull(::parseContentIndexAsset)
         .filter { it.type in SillyTavernCompatibleAssetTypes }
+
+fun parseSillyTavernSpriteFiles(jsonText: String): List<SillyTavernSpriteFile> =
+    ResourceJson.parseToJsonElement(jsonText)
+        .asArrayOrNull()
+        .orEmpty()
+        .mapNotNull { it.asObjectOrNull() }
+        .mapNotNull(::parseSpriteFile)
+        .sortedWith(
+            compareBy<SillyTavernSpriteFile> { it.label != "neutral" }
+                .thenBy { it.label.lowercase() }
+                .thenBy { it.fileName.lowercase() }
+        )
+
+fun sillyTavernSpritesDirectoryApiUrl(filename: String): String =
+    "$SILLY_TAVERN_CONTENTS_API_BASE_URL/${filename.toUrlPath()}?ref=release"
 
 private fun parseSillyTavernResourceElement(
     element: JsonElement,
@@ -218,6 +242,20 @@ private fun parseContentIndexAsset(json: JsonObject): SillyTavernMarketAsset? {
     )
 }
 
+private fun parseSpriteFile(json: JsonObject): SillyTavernSpriteFile? {
+    val name = json.stringValue("name")?.takeIf { it.isNotBlank() } ?: return null
+    val type = json.stringValue("type")
+    if (type != null && type != "file") return null
+    val extension = name.substringAfterLast('.', missingDelimiterValue = "").lowercase()
+    if (extension !in SillyTavernSpriteImageExtensions) return null
+    val downloadUrl = json.stringValue("download_url")?.takeIf { it.isNotBlank() } ?: return null
+    return SillyTavernSpriteFile(
+        label = name.substringBeforeLast('.').ifBlank { name },
+        fileName = name,
+        downloadUrl = downloadUrl,
+    )
+}
+
 private val SillyTavernCompatibleAssetTypes = setOf(
     "world",
     "openai_preset",
@@ -234,7 +272,10 @@ private val SillyTavernCompatibleAssetTypes = setOf(
     "regex",
     "regex_scripts",
     "character",
+    "sprites",
 )
+
+private val SillyTavernSpriteImageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif")
 
 private fun String.toUrlPath(): String =
     split('/').joinToString("/") { segment ->

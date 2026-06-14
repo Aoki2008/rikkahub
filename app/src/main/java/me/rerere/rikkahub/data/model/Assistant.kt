@@ -53,7 +53,32 @@ data class Assistant(
     val instructPresetId: Uuid? = null, // 绑定的 Text Completion instruct 预设
     val systemPromptPresetId: Uuid? = null, // 绑定的 Text Completion system prompt 预设(可选)
     val reasoningPresetId: Uuid? = null, // 绑定的 SillyTavern reasoning 预设(思考标签分离)
+    val expressionSprites: List<ExpressionSprite> = emptyList(), // SillyTavern expression images / sprites
+    val selectedExpression: String? = null, // 当前手动选中的 expression label；为空时使用角色头像
 )
+
+@Serializable
+data class ExpressionSprite(
+    val label: String,
+    val imageUrl: String,
+)
+
+fun Assistant.selectedExpressionSprite(): ExpressionSprite? {
+    val selected = selectedExpression?.expressionKey() ?: return null
+    return expressionSprites.firstOrNull { sprite ->
+        sprite.label.expressionKey() == selected
+    }
+}
+
+fun Assistant.chatAvatar(): Avatar =
+    selectedExpressionSprite()?.let { Avatar.Image(it.imageUrl) } ?: avatar
+
+fun List<ExpressionSprite>.defaultExpressionLabel(): String? =
+    firstOrNull { it.label.expressionKey() == "neutral" }?.label
+        ?: firstOrNull()?.label
+
+private fun String.expressionKey(): String =
+    trim().lowercase()
 
 /**
  * 作者注释 (Author's Note)

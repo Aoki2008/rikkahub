@@ -3,6 +3,9 @@ package me.rerere.rikkahub.ui.pages.assistant.detail
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import me.rerere.rikkahub.data.model.Avatar
+import me.rerere.rikkahub.data.model.ExpressionSprite
+import me.rerere.rikkahub.data.model.chatAvatar
+import me.rerere.rikkahub.data.model.defaultExpressionLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -45,5 +48,22 @@ class AssistantImporterTest {
         assertEquals(Avatar.Dummy, assistant.avatar)
         assertFalse(assistant.useAssistantAvatar)
         assertNull(assistant.background)
+    }
+
+    @Test
+    fun `selected expression sprite overrides chat avatar only`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(
+                ExpressionSprite(label = "neutral", imageUrl = "file://neutral.png"),
+                ExpressionSprite(label = "joy", imageUrl = "file://joy.png"),
+            ),
+            selectedExpression = "joy",
+        )
+        val avatar = assistant.chatAvatar()
+
+        assertTrue(avatar is Avatar.Image)
+        assertEquals("file://joy.png", (avatar as Avatar.Image).url)
+        assertEquals("content://character-card.png", (assistant.avatar as Avatar.Image).url)
+        assertEquals("neutral", assistant.expressionSprites.defaultExpressionLabel())
     }
 }

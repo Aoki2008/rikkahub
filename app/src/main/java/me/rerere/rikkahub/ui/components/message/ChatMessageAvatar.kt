@@ -17,6 +17,7 @@ import me.rerere.ai.ui.isEmptyUIMessage
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
+import me.rerere.rikkahub.data.model.chatAvatar
 import me.rerere.rikkahub.ui.components.ui.AutoAIIcon
 import me.rerere.rikkahub.ui.components.ui.UIAvatar
 import me.rerere.rikkahub.ui.context.LocalSettings
@@ -74,7 +75,7 @@ fun ChatMessageAssistantAvatar(
                     UIAvatar(
                         name = assistant.name,
                         modifier = Modifier.size(28.dp),
-                        value = assistant.avatar,
+                        value = assistant.chatAvatar(),
                         loading = loading,
                     )
                 }

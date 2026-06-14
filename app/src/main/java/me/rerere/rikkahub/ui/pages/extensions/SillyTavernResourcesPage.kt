@@ -266,9 +266,14 @@ private val SillyTavernExtensionCatalog = listOf(
         description = "Character-card depth prompts import as native depth injections.",
     ),
     SillyTavernExtensionCompat(
-        name = "Sprites, Expressions, TTS",
+        name = "Sprites / Character Expressions",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Official sprite folders import as native expression images and can be selected per character.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "TTS",
         status = SillyTavernExtensionStatus.Partial,
-        description = "Data can be carried by cards, but runtime UX needs Android-native controls instead of browser panels.",
+        description = "Native TTS providers exist, but full SillyTavern extension settings are not mapped one-to-one.",
     ),
     SillyTavernExtensionCompat(
         name = "Third-party browser JS extensions",

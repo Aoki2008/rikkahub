@@ -22,10 +22,14 @@ import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.files.saveUploadFromBytes
+import me.rerere.rikkahub.data.model.ExpressionSprite
 import me.rerere.rikkahub.data.model.SillyTavernMarketAsset
 import me.rerere.rikkahub.data.model.SillyTavernResourceImport
+import me.rerere.rikkahub.data.model.defaultExpressionLabel
 import me.rerere.rikkahub.data.model.parseSillyTavernContentIndex
 import me.rerere.rikkahub.data.model.parseSillyTavernResources
+import me.rerere.rikkahub.data.model.parseSillyTavernSpriteFiles
+import me.rerere.rikkahub.data.model.sillyTavernSpritesDirectoryApiUrl
 import me.rerere.rikkahub.ui.pages.assistant.detail.ParsedCard
 import me.rerere.rikkahub.ui.pages.assistant.detail.parseTavernCard
 import me.rerere.rikkahub.utils.ImageUtils
@@ -46,13 +50,15 @@ data class SillyTavernResourcesUiState(
 
 data class SillyTavernImportReport(
     val assistantCount: Int = 0,
+    val spriteCount: Int = 0,
     val resources: SillyTavernResourceImport = SillyTavernResourceImport(),
 ) {
     val appliedCount: Int
-        get() = assistantCount + resources.globalResourceCount + resources.regexes.size
+        get() = assistantCount + spriteCount + resources.globalResourceCount + resources.regexes.size
 
     fun summary(): String = buildList {
         if (assistantCount > 0) add("characters $assistantCount")
+        if (spriteCount > 0) add("sprites $spriteCount")
         if (resources.promptPresets.isNotEmpty()) add("chat presets ${resources.promptPresets.size}")
         if (resources.contextPresets.isNotEmpty()) add("context presets ${resources.contextPresets.size}")
         if (resources.instructPresets.isNotEmpty()) add("instruct presets ${resources.instructPresets.size}")
@@ -141,13 +147,15 @@ class SillyTavernResourcesVM(
         viewModelScope.launch(Dispatchers.IO) {
             _uiState.update { it.copy(importingAsset = asset.filename) }
             try {
-                val report = if (asset.type == "character") {
-                    importCharacterPngBytes(
+                val report = when (asset.type) {
+                    "character" -> importCharacterPngBytes(
                         bytes = downloadBytes(asset.downloadUrl),
                         displayName = asset.filename.substringAfterLast('/'),
                     )
-                } else {
-                    importJsonText(
+
+                    "sprites" -> importSprites(asset)
+
+                    else -> importJsonText(
                         jsonText = downloadText(asset.downloadUrl),
                         fallbackName = asset.displayName,
                     )
@@ -209,6 +217,28 @@ class SillyTavernResourcesVM(
         val parsed = parseCharacterCardJsonOrNull(jsonText, avatarImage)
             ?: error("No SillyTavern character card metadata found")
         return applyParsedCard(parsed)
+    }
+
+    private suspend fun importSprites(asset: SillyTavernMarketAsset): SillyTavernImportReport {
+        val spriteFiles = parseSillyTavernSpriteFiles(
+            downloadText(sillyTavernSpritesDirectoryApiUrl(asset.filename))
+        )
+        if (spriteFiles.isEmpty()) {
+            error("No SillyTavern sprite images found")
+        }
+        val sprites = spriteFiles.map { sprite ->
+            val saved = filesManager.saveUploadFromBytes(
+                bytes = downloadBytes(sprite.downloadUrl),
+                displayName = "${asset.displayName}_${sprite.fileName}",
+                mimeType = sprite.fileName.toImageMimeType(),
+            )
+            ExpressionSprite(
+                label = sprite.label,
+                imageUrl = filesManager.getFile(saved).toUri().toString(),
+            )
+        }
+        applySprites(characterName = asset.displayName, sprites = sprites)
+        return SillyTavernImportReport(spriteCount = sprites.size)
     }
 
     private fun parseCharacterCardJsonOrNull(
@@ -281,6 +311,35 @@ class SillyTavernResourcesVM(
         }
     }
 
+    private suspend fun applySprites(
+        characterName: String,
+        sprites: List<ExpressionSprite>,
+    ) {
+        settingsStore.update { settings ->
+            val targetAssistantId = settings.assistants.firstOrNull { assistant ->
+                assistant.name.equals(characterName, ignoreCase = true)
+            }?.id ?: settings.assistantId
+            settings.copy(
+                assistants = settings.assistants.map { assistant ->
+                    if (assistant.id != targetAssistantId) {
+                        assistant
+                    } else {
+                        val mergedSprites = assistant.expressionSprites.mergeDistinctByName(sprites) { it.label }
+                        assistant.copy(
+                            expressionSprites = mergedSprites,
+                            selectedExpression = assistant.selectedExpression
+                                ?.takeIf { selected ->
+                                    mergedSprites.any { it.label.equals(selected, ignoreCase = true) }
+                                }
+                                ?: mergedSprites.defaultExpressionLabel(),
+                            useAssistantAvatar = true,
+                        )
+                    }
+                },
+            )
+        }
+    }
+
     private fun downloadText(url: String): String =
         downloadBytes(url).toString(Charsets.UTF_8)
 
@@ -298,6 +357,13 @@ class SillyTavernResourcesVM(
             return response.body.bytes()
         }
     }
+}
+
+private fun String.toImageMimeType(): String = when (substringAfterLast('.', "").lowercase()) {
+    "jpg", "jpeg" -> "image/jpeg"
+    "webp" -> "image/webp"
+    "gif" -> "image/gif"
+    else -> "image/png"
 }
 
 private fun <T> List<T>.mergeDistinctByName(
