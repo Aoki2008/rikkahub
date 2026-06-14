@@ -115,6 +115,8 @@ jobs:
     runs-on: ubuntu-latest
     needs: unit-tests
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download APK
         uses: actions/download-artifact@v4
         with:
@@ -135,25 +137,4 @@ jobs:
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            echo "=== artifact contents ==="; ls -R apk || true
-            APK=$(find apk -name '*x86_64*.apk' | head -1)
-            [ -z "$APK" ] && APK=$(find apk -name '*universal*.apk' | head -1)
-            [ -z "$APK" ] && APK=$(find apk -name '*.apk' | head -1)
-            echo "Selected APK: $APK"
-            if [ -z "$APK" ]; then echo "No APK found in artifact"; exit 1; fi
-            adb install -r "$APK"
-            adb logcat -c
-            adb shell am start -W -n me.rerere.rikkahub.st.debug/me.rerere.rikkahub.RouteActivity
-            sleep 25
-            adb logcat -d -b crash > crash.txt || true
-            if [ -s crash.txt ]; then
-              echo "=== CRASH DETECTED ==="; cat crash.txt; exit 1
-            fi
-            if adb shell pidof me.rerere.rikkahub.st.debug >/dev/null 2>&1; then
-              echo "PASS: app launched and is still running (no crash)"
-            else
-              echo "FAIL: app process not running after launch"
-              adb logcat -d | tail -200
-              exit 1
-            fi
+          script: bash .github/smoke.sh
