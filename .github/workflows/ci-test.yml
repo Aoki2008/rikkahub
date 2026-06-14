@@ -92,6 +92,7 @@ jobs:
             --tests "me.rerere.rikkahub.data.model.PromptPresetParserTest" \
             --tests "me.rerere.rikkahub.data.ai.transformers.PromptManagerIntegrationTest" \
             --tests "me.rerere.rikkahub.data.model.TextCompletionPresetParserTest" \
+            --tests "me.rerere.rikkahub.data.model.SillyTavernRegexParserTest" \
             --tests "me.rerere.rikkahub.data.ai.TextCompletionPromptAssemblerTest" \
             --tests "me.rerere.rikkahub.data.ai.transformers.TextCompletionPresetIntegrationTest"
 
