@@ -73,4 +73,38 @@ class QuickMessageExecutionTest {
         assertEquals("Look around.", plan.inputText)
         assertEquals(QuickMessageSendMode.NORMAL, plan.sendMode)
     }
+
+    @Test
+    fun `slash command pipe feeds send when send has no argument`() {
+        val quickMessage = QuickMessage(
+            title = "Narrate",
+            content = "/echo The torches dim. | /send",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals("The torches dim.", plan.inputText)
+        assertEquals(QuickMessageSendMode.WITHOUT_RESPONSE, plan.sendMode)
+    }
+
+    @Test
+    fun `slash command pipe feeds setinput when setinput has no argument`() {
+        val quickMessage = QuickMessage(
+            title = "Draft",
+            content = "/echo Ask {{char}} about the sealed gate. | /setinput",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "old text",
+        )
+
+        assertEquals("Ask {{char}} about the sealed gate.", plan.inputText)
+        assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
+    }
 }
