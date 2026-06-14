@@ -98,7 +98,7 @@ class SillyTavernResourceImporterTest {
             assets.map { it.type },
         )
         assertTrue(assets.last().downloadUrl.endsWith("default_Seraphina.png"))
-        assertTrue(assets[2].downloadUrl.contains("presets/openai/Default.json"))
-        assertTrue(assets[3].downloadUrl.contains("Llama%203%20Instruct.json"))
+        assertTrue(assets[1].downloadUrl.contains("presets/openai/Default.json"))
+        assertTrue(assets[2].downloadUrl.contains("Llama%203%20Instruct.json"))
     }
 }
