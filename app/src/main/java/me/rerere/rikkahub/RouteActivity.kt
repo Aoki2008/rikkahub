@@ -93,6 +93,7 @@ import me.rerere.rikkahub.ui.pages.extensions.PromptPage
 import me.rerere.rikkahub.ui.pages.extensions.QuickMessagesPage
 import me.rerere.rikkahub.ui.pages.extensions.SkillDetailPage
 import me.rerere.rikkahub.ui.pages.extensions.SkillsPage
+import me.rerere.rikkahub.ui.pages.extensions.SillyTavernResourcesPage
 import me.rerere.rikkahub.ui.pages.favorite.FavoritePage
 import me.rerere.rikkahub.ui.pages.history.HistoryPage
 import me.rerere.rikkahub.ui.pages.imggen.ImageGenPage
@@ -481,6 +482,10 @@ class RouteActivity : ComponentActivity() {
                                 PromptPage()
                             }
 
+                            entry<Screen.SillyTavernResources> {
+                                SillyTavernResourcesPage()
+                            }
+
                             entry<Screen.Skills> {
                                 SkillsPage()
                             }
@@ -674,6 +679,9 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object Prompts : Screen
+
+    @Serializable
+    data object SillyTavernResources : Screen
 
     @Serializable
     data object Skills : Screen

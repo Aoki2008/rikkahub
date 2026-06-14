@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.rikkahub.R
 import me.rerere.hugeicons.stroke.Book03
+import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.hugeicons.stroke.Puzzle
 import me.rerere.hugeicons.stroke.Zap
 import me.rerere.rikkahub.Screen
@@ -65,6 +66,12 @@ fun ExtensionsPage() {
                         leadingContent = { Icon(HugeIcons.Book03, null) },
                         headlineContent = { Text(stringResource(R.string.extensions_page_prompts)) },
                         supportingContent = { Text(stringResource(R.string.extensions_page_prompts_desc)) },
+                    )
+                    item(
+                        onClick = { navController.navigate(Screen.SillyTavernResources) },
+                        leadingContent = { Icon(HugeIcons.FileImport, null) },
+                        headlineContent = { Text(stringResource(R.string.extensions_page_st_resources)) },
+                        supportingContent = { Text(stringResource(R.string.extensions_page_st_resources_desc)) },
                     )
                     item(
                         onClick = { navController.navigate(Screen.Skills) },

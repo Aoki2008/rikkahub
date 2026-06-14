@@ -367,6 +367,8 @@
   <string name="extensions_page_prompts_desc">Manage and use custom prompts</string>
   <string name="extensions_page_quick_messages_desc">Manage shared quick message templates</string>
   <string name="extensions_page_section_extensions">Extensions</string>
+  <string name="extensions_page_st_resources">SillyTavern Resources</string>
+  <string name="extensions_page_st_resources_desc">Import Tavern character cards, lorebooks, presets, quick replies, and official assets</string>
   <string name="extensions_page_title">Extensions</string>
   <string name="favorite_page_no_favorites">No favorites yet</string>
   <string name="favorite_page_removed">Favorite removed</string>
@@ -868,7 +870,7 @@
   <string name="setting_page_web_server">Web Server</string>
   <string name="setting_page_web_server_address_note">Address Notes</string>
   <string name="setting_page_web_server_address_note_desc">LAN Address: Uses device WiFi IP, accessible to other devices on the same network. Unavailable on mobile data.\nLocal Address: Uses localhost, accessible on this device only.\nmDNS Address: Uses .local hostname, accessible by name from other devices on the same network without knowing the IP.</string>
-  <string name="setting_page_web_server_desc">Allow you access RikkaHub via Web</string>
+  <string name="setting_page_web_server_desc">Allow you access RikkaHub ST via Web</string>
   <string name="setting_page_web_server_error">Error</string>
   <string name="setting_page_web_server_jwt_enable">Enable authentication</string>
   <string name="setting_page_web_server_jwt_enable_desc">Require password verification when accessing the web interface</string>
@@ -1018,6 +1020,17 @@
   <string name="skill_detail_page_file_name_invalid">Invalid file name</string>
   <string name="skill_detail_page_new_file">New File</string>
   <string name="skill_detail_page_save">Save</string>
+  <string name="st_resources_import_asset">Import</string>
+  <string name="st_resources_import_failed">Import failed: %s</string>
+  <string name="st_resources_import_from_file">Import from File</string>
+  <string name="st_resources_import_from_file_desc">Supports JSON resources and PNG Tavern character cards</string>
+  <string name="st_resources_import_section">Import</string>
+  <string name="st_resources_import_success">Imported: %s</string>
+  <string name="st_resources_load_market">Load Official Asset List</string>
+  <string name="st_resources_load_market_desc">Browse compatible items from SillyTavern default content</string>
+  <string name="st_resources_market_loaded">Loaded %s compatible assets</string>
+  <string name="st_resources_market_section">Official Assets</string>
+  <string name="st_resources_page_title">SillyTavern Resources</string>
   <string name="skills_page_add_title">Add Skill</string>
   <string name="skills_page_delete_message">Are you sure you want to delete "%s"? This action cannot be undone.</string>
   <string name="skills_page_delete_title">Delete Skill</string>
