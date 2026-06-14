@@ -367,6 +367,11 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
             if (params.temperature != null) put("temperature", params.temperature)
             if (params.topP != null) put("topP", params.topP)
             if (params.maxTokens != null) put("maxOutputTokens", params.maxTokens)
+            if (params.stopSequences.isNotEmpty()) {
+                putJsonArray("stopSequences") {
+                    params.stopSequences.forEach { add(it) }
+                }
+            }
             if (params.model.outputModalities.contains(Modality.IMAGE)) {
                 put("responseModalities", buildJsonArray {
                     add(JsonPrimitive("TEXT"))

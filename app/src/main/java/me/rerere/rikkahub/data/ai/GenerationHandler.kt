@@ -33,6 +33,7 @@ import me.rerere.ai.ui.limitContext
 import me.rerere.rikkahub.data.ai.transformers.InputMessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.MessageTransformer
 import me.rerere.rikkahub.data.ai.transformers.OutputMessageTransformer
+import me.rerere.rikkahub.data.ai.transformers.buildTextCompletionStopSequences
 import me.rerere.rikkahub.data.ai.transformers.onGenerationFinish
 import me.rerere.rikkahub.data.ai.transformers.transforms
 import me.rerere.rikkahub.data.ai.transformers.visualTransforms
@@ -405,6 +406,7 @@ class GenerationHandler(
             maxTokens = boundPreset?.maxTokens ?: assistant.maxTokens,
             tools = tools,
             reasoningLevel = assistant.reasoningLevel,
+            stopSequences = buildTextCompletionStopSequences(assistant, settings),
             customHeaders = buildList {
                 addAll(assistant.customHeaders)
                 addAll(model.customHeaders)

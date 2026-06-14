@@ -40,6 +40,76 @@ internal fun hasResolvedTextCompletionPresetBinding(
         settings.instructPresets.any { it.id == instructId }
 }
 
+internal fun buildTextCompletionStopSequences(
+    assistant: Assistant,
+    settings: Settings,
+): List<String> {
+    if (assistant.promptPresetId != null) return emptyList()
+    val contextPresetId = assistant.contextPresetId ?: return emptyList()
+    val instructPresetId = assistant.instructPresetId ?: return emptyList()
+    val contextPreset = settings.contextPresets.firstOrNull { it.id == contextPresetId } ?: return emptyList()
+    val instructPreset = settings.instructPresets.firstOrNull { it.id == instructPresetId } ?: return emptyList()
+    val persona = settings.selectedPersonaId
+        ?.let { id -> settings.personas.firstOrNull { it.id == id } }
+        ?.takeIf { it.enabled }
+    val userName = persona?.name?.ifBlank { null } ?: "User"
+    val characterName = assistant.name.ifBlank { "Assistant" }
+    val result = linkedSetOf<String>()
+
+    fun renderMacros(value: String): String =
+        value
+            .replace("{{user}}", userName, ignoreCase = true)
+            .replace("{{char}}", characterName, ignoreCase = true)
+
+    fun replaceNameMacro(value: String, name: String): String =
+        value.replace(Regex("\\{\\{name\\}\\}", RegexOption.IGNORE_CASE), name)
+
+    fun addStop(value: String) {
+        if (value.trim().isNotEmpty()) {
+            result += value
+        }
+    }
+
+    fun addInstructSequence(value: String) {
+        if (value.isEmpty() || value.trim().isEmpty()) return
+        val wrapped = if (instructPreset.wrap) "\n$value" else value
+        addStop(if (instructPreset.macro) renderMacros(wrapped) else wrapped)
+    }
+
+    val instructSequences = buildList {
+        add(instructPreset.stopSequence)
+        if (instructPreset.sequencesAsStopStrings) {
+            add(replaceNameMacro(instructPreset.inputSequence, userName))
+            add(replaceNameMacro(instructPreset.outputSequence, characterName))
+            add(replaceNameMacro(instructPreset.firstOutputSequence, characterName))
+            add(replaceNameMacro(instructPreset.lastOutputSequence, characterName))
+            add(replaceNameMacro(instructPreset.systemSequence, "System"))
+            add(replaceNameMacro(instructPreset.lastSystemSequence, "System"))
+        }
+    }
+    instructSequences
+        .joinToString("\n")
+        .split("\n")
+        .distinct()
+        .forEach(::addInstructSequence)
+
+    if (contextPreset.useStopStrings) {
+        if (contextPreset.chatStart.isNotBlank()) {
+            addStop("\n${renderMacros(contextPreset.chatStart)}")
+        }
+        if (contextPreset.exampleSeparator.isNotBlank()) {
+            addStop("\n${renderMacros(contextPreset.exampleSeparator)}")
+        }
+    }
+
+    if (contextPreset.namesAsStopStrings) {
+        addStop("\n$userName:")
+        addStop("\n$characterName:")
+    }
+
+    return result.toList()
+}
+
 /**
  * 核心组装逻辑（纯函数，便于测试）。
  *

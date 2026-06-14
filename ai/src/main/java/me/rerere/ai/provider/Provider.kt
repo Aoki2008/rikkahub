@@ -59,6 +59,7 @@ data class TextGenerationParams(
     val maxTokens: Int? = null,
     val tools: List<Tool> = emptyList(),
     val reasoningLevel: ReasoningLevel = ReasoningLevel.OFF,
+    val stopSequences: List<String> = emptyList(),
     val customHeaders: List<CustomHeader> = emptyList(),
     val customBody: List<CustomBody> = emptyList(),
 )

@@ -282,6 +282,11 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
                 params.temperature
             )
             if (params.topP != null) put("top_p", params.topP)
+            if (params.stopSequences.isNotEmpty()) {
+                putJsonArray("stop_sequences") {
+                    params.stopSequences.forEach { add(it) }
+                }
+            }
 
             put("stream", stream)
 

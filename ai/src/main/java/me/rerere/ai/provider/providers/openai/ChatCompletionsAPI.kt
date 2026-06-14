@@ -261,6 +261,11 @@ class ChatCompletionsAPI(
                 if (params.topP != null) put("top_p", params.topP)
             }
             if (params.maxTokens != null) put("max_tokens", params.maxTokens)
+            if (params.stopSequences.isNotEmpty()) {
+                putJsonArray("stop") {
+                    params.stopSequences.forEach { add(it) }
+                }
+            }
 
             put("stream", stream)
             if (stream) {

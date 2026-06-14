@@ -1,8 +1,19 @@
 package me.rerere.rikkahub.data.ai.transformers
 
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import me.rerere.ai.core.MessageRole
+import me.rerere.ai.provider.Model
+import me.rerere.ai.provider.ProviderSetting
+import me.rerere.ai.provider.TextGenerationParams
+import me.rerere.ai.provider.providers.ClaudeProvider
+import me.rerere.ai.provider.providers.GoogleProvider
+import me.rerere.ai.provider.providers.openai.ChatCompletionsAPI
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
+import me.rerere.ai.util.KeyRoulette
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.CharacterCard
@@ -17,6 +28,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import okhttp3.OkHttpClient
 import kotlin.uuid.Uuid
 
 class TextCompletionPresetIntegrationTest {
@@ -141,6 +153,76 @@ class TextCompletionPresetIntegrationTest {
         assertNull(buildTextCompletionPresetMessages(assistant.copy(instructPresetId = Uuid.random()), settings, incoming))
     }
 
+    @Test
+    fun `bound text-completion presets derive SillyTavern stop strings`() {
+        val context = ContextPreset(
+            chatStart = "<START {{char}}>",
+            exampleSeparator = "<EXAMPLE {{user}}>",
+            useStopStrings = true,
+            namesAsStopStrings = true,
+        )
+        val instruct = InstructPreset(
+            inputSequence = "### Instruction {{name}}:\n",
+            outputSequence = "### Response {{name}}:\n",
+            firstOutputSequence = "### First {{char}}:\n",
+            lastOutputSequence = "### Last {{name}}:\n",
+            systemSequence = "### {{name}}:\n",
+            lastSystemSequence = "### Last {{name}}:\n",
+            stopSequence = "</s>\n<END>",
+            wrap = true,
+            macro = true,
+            sequencesAsStopStrings = true,
+        )
+        val persona = Persona(name = "Hero", enabled = true)
+        val assistant = Assistant(
+            name = "Mira",
+            contextPresetId = context.id,
+            instructPresetId = instruct.id,
+        )
+        val settings = Settings(
+            contextPresets = listOf(context),
+            instructPresets = listOf(instruct),
+            personas = listOf(persona),
+            selectedPersonaId = persona.id,
+        )
+
+        assertEquals(
+            listOf(
+                "\n</s>",
+                "\n<END>",
+                "\n### Instruction Hero:",
+                "\n### Response Mira:",
+                "\n### First Mira:",
+                "\n### Last Mira:",
+                "\n### System:",
+                "\n### Last System:",
+                "\n<START Mira>",
+                "\n<EXAMPLE Hero>",
+                "\nHero:",
+                "\nMira:",
+            ),
+            buildTextCompletionStopSequences(assistant, settings),
+        )
+    }
+
+    @Test
+    fun `provider request bodies serialize stop sequences`() {
+        val model = Model(modelId = "test-model", displayName = "Test Model")
+        val params = TextGenerationParams(
+            model = model,
+            stopSequences = listOf("\nHero:", "\nMira:"),
+        )
+
+        val chatBody = ChatCompletionsAPI(OkHttpClient(), KeyRoulette.default()).buildChatRequest(params)
+        assertEquals(listOf("\nHero:", "\nMira:"), chatBody.stringArray("stop"))
+
+        val claudeBody = ClaudeProvider(OkHttpClient()).buildClaudeRequest(params)
+        assertEquals(listOf("\nHero:", "\nMira:"), claudeBody.stringArray("stop_sequences"))
+
+        val googleBody = GoogleProvider(OkHttpClient()).buildGoogleRequest(params)
+        assertEquals(listOf("\nHero:", "\nMira:"), googleBody["generationConfig"]!!.jsonObject.stringArray("stopSequences"))
+    }
+
     private fun assertInOrder(text: String, vararg fragments: String) {
         var cursor = -1
         fragments.forEach { fragment ->
@@ -153,4 +235,41 @@ class TextCompletionPresetIntegrationTest {
 
     private fun String.noneOf(vararg fragments: String): Boolean =
         fragments.none { contains(it) }
+
+    private fun ChatCompletionsAPI.buildChatRequest(params: TextGenerationParams): JsonObject {
+        val method = ChatCompletionsAPI::class.java.getDeclaredMethod(
+            "buildChatCompletionRequest",
+            List::class.java,
+            TextGenerationParams::class.java,
+            ProviderSetting.OpenAI::class.java,
+            Boolean::class.javaPrimitiveType,
+        )
+        method.isAccessible = true
+        return method.invoke(this, listOf(UIMessage.user("hello")), params, ProviderSetting.OpenAI(), false) as JsonObject
+    }
+
+    private fun ClaudeProvider.buildClaudeRequest(params: TextGenerationParams): JsonObject {
+        val method = ClaudeProvider::class.java.getDeclaredMethod(
+            "buildMessageRequest",
+            ProviderSetting.Claude::class.java,
+            List::class.java,
+            TextGenerationParams::class.java,
+            Boolean::class.javaPrimitiveType,
+        )
+        method.isAccessible = true
+        return method.invoke(this, ProviderSetting.Claude(), listOf(UIMessage.user("hello")), params, false) as JsonObject
+    }
+
+    private fun GoogleProvider.buildGoogleRequest(params: TextGenerationParams): JsonObject {
+        val method = GoogleProvider::class.java.getDeclaredMethod(
+            "buildCompletionRequestBody",
+            List::class.java,
+            TextGenerationParams::class.java,
+        )
+        method.isAccessible = true
+        return method.invoke(this, listOf(UIMessage.user("hello")), params) as JsonObject
+    }
+
+    private fun JsonObject.stringArray(key: String): List<String> =
+        get(key)!!.jsonArray.map { it.jsonPrimitive.content }
 }
