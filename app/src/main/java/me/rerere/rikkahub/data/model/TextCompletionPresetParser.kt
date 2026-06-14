@@ -6,6 +6,32 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
 
+sealed class TextCompletionPresetImport {
+    data class Context(val preset: ContextPreset) : TextCompletionPresetImport()
+    data class Instruct(val preset: InstructPreset) : TextCompletionPresetImport()
+    data class SystemPrompt(val preset: SystemPromptPreset) : TextCompletionPresetImport()
+    data object Unknown : TextCompletionPresetImport()
+}
+
+fun parseSillyTavernTextCompletionPreset(
+    json: JsonObject,
+    fallbackName: String,
+): TextCompletionPresetImport = when {
+    json.hasKey("story_string") -> TextCompletionPresetImport.Context(
+        parseSillyTavernContextPreset(json, fallbackName)
+    )
+
+    json.hasKey("input_sequence") || json.hasKey("output_sequence") -> TextCompletionPresetImport.Instruct(
+        parseSillyTavernInstructPreset(json, fallbackName)
+    )
+
+    json.hasKey("content") || json.hasKey("post_history") -> TextCompletionPresetImport.SystemPrompt(
+        parseSillyTavernSystemPromptPreset(json, fallbackName)
+    )
+
+    else -> TextCompletionPresetImport.Unknown
+}
+
 fun parseSillyTavernContextPreset(json: JsonObject, fallbackName: String): ContextPreset {
     fun str(key: String) = json[key]?.let { runCatching { it.jsonPrimitive.contentOrNull }.getOrNull() }
     fun int(key: String) = json[key]?.let { runCatching { it.jsonPrimitive.intOrNull }.getOrNull() }
@@ -67,3 +93,5 @@ fun parseSillyTavernSystemPromptPreset(json: JsonObject, fallbackName: String): 
         postHistory = str("post_history").orEmpty(),
     )
 }
+
+private fun JsonObject.hasKey(key: String): Boolean = containsKey(key)

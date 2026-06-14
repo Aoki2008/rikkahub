@@ -163,6 +163,21 @@ class TextCompletionPresetParserTest {
     }
 
     @Test
+    fun `classify blank system prompt preset by field presence`() {
+        val raw = """{"name":"Blank","content":"","post_history":""}"""
+
+        val imported = parseSillyTavernTextCompletionPreset(
+            json.parseToJsonElement(raw).jsonObject,
+            "Fallback",
+        )
+
+        val systemPrompt = imported as TextCompletionPresetImport.SystemPrompt
+        assertEquals("Blank", systemPrompt.preset.name)
+        assertEquals("", systemPrompt.preset.content)
+        assertEquals("", systemPrompt.preset.postHistory)
+    }
+
+    @Test
     fun `reject unknown text completion preset shape`() {
         val raw = """{"name":"Not a preset","temperature":0.7}"""
 

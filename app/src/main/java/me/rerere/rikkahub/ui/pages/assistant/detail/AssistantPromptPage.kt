@@ -212,6 +212,12 @@ private fun AssistantPromptContent(
             onUpdate = onUpdate,
         )
 
+        TextCompletionPresetCard(
+            assistant = assistant,
+            settings = settings,
+            onUpdate = onUpdate,
+        )
+
         CharacterCardExportButton(
             assistant = assistant,
             lorebooks = settings.lorebooks,
