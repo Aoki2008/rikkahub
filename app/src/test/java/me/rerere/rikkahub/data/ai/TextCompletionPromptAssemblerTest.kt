@@ -166,4 +166,32 @@ class TextCompletionPromptAssemblerTest {
             cursor = index
         }
     }
+
+    @Test
+    fun `user alignment message is forced before history when last turn is not user`() {
+        val prompt = TextCompletionPromptAssembler.assemble(
+            TextCompletionAssemblyInput(
+                contextPreset = ContextPreset(
+                    storyString = "",
+                    chatStart = "[Start]",
+                ),
+                instructPreset = InstructPreset(
+                    inputSequence = "U:",
+                    firstInputSequence = "FIRST_U:",
+                    outputSequence = "A:",
+                    userAlignmentMessage = "{{user}} should answer as {{char}}.",
+                ),
+                chatHistory = listOf(UIMessage.assistant("Greeting.")),
+                userName = "Hero",
+                characterName = "Mira",
+            )
+        )
+
+        assertInOrder(
+            prompt,
+            "[Start]",
+            "FIRST_U:Hero should answer as Mira.",
+            "A:Greeting.",
+        )
+    }
 }
