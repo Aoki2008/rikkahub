@@ -2,6 +2,7 @@ package me.rerere.rikkahub.ui.pages.setting
 
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.Code
+import me.rerere.hugeicons.stroke.Download01
 import me.rerere.hugeicons.stroke.Earth
 import me.rerere.hugeicons.stroke.File02
 import me.rerere.hugeicons.stroke.Github
@@ -162,6 +163,18 @@ fun SettingAboutPage() {
                             leadingContent = { Icon(HugeIcons.Earth, null) },
                             supportingContent = { Text(AppLinks.PROJECT_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_website)) },
+                        )
+                        item(
+                            onClick = { context.openUrl(AppLinks.DOCUMENTATION_URL) },
+                            leadingContent = { Icon(HugeIcons.Code, null) },
+                            supportingContent = { Text(AppLinks.DOCUMENTATION_URL) },
+                            headlineContent = { Text(stringResource(R.string.about_page_readme)) },
+                        )
+                        item(
+                            onClick = { context.openUrl(AppLinks.RELEASES_URL) },
+                            leadingContent = { Icon(HugeIcons.Download01, null) },
+                            supportingContent = { Text(AppLinks.RELEASES_URL) },
+                            headlineContent = { Text(stringResource(R.string.about_page_releases)) },
                         )
                         item(
                             onClick = { context.openUrl(AppLinks.REPOSITORY_URL) },

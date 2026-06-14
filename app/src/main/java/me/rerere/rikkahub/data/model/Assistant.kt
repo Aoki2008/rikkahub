@@ -55,6 +55,7 @@ data class Assistant(
     val reasoningPresetId: Uuid? = null, // 绑定的 SillyTavern reasoning 预设(思考标签分离)
     val expressionSprites: List<ExpressionSprite> = emptyList(), // SillyTavern expression images / sprites
     val selectedExpression: String? = null, // 当前手动选中的 expression label；为空时使用角色头像
+    val autoSelectExpression: Boolean = true, // 根据最新助手回复自动切换 SillyTavern expression
 )
 
 @Serializable
@@ -115,10 +116,151 @@ fun Assistant.selectExpression(label: String): ExpressionSelectionResult {
     )
 }
 
+fun Assistant.selectExpressionFromReply(replyText: String): ExpressionSelectionResult {
+    if (!autoSelectExpression || expressionSprites.isEmpty() || replyText.isBlank()) {
+        return ExpressionSelectionResult(this, ExpressionSelectionStatus.IGNORED)
+    }
+
+    val label = inferExpressionLabelFromReply(replyText, expressionSprites)
+        ?: return ExpressionSelectionResult(this, ExpressionSelectionStatus.IGNORED)
+    return selectExpression(label)
+}
+
+internal fun inferExpressionLabelFromReply(
+    replyText: String,
+    sprites: List<ExpressionSprite>,
+): String? {
+    if (replyText.isBlank() || sprites.isEmpty()) return null
+
+    findExplicitExpressionLabel(replyText, sprites)?.let { return it.label }
+
+    val scored = expressionKeywordGroups
+        .mapNotNull { group ->
+            val sprite = sprites.findSpriteByAnyKey(group.spriteKeys) ?: return@mapNotNull null
+            val score = group.keywordPatterns.sumOf { pattern -> pattern.findAll(replyText).count() }
+            if (score > 0) sprite to score else null
+        }
+        .maxWithOrNull(
+            compareBy<Pair<ExpressionSprite, Int>> { it.second }
+                .thenByDescending { it.first.label == sprites.defaultExpressionLabel() }
+        )
+
+    if (scored != null) return scored.first.label
+    return sprites.defaultExpressionLabel()
+}
+
 private val expressionResetKeys = setOf("default", "none", "reset", "clear", "off")
 
 private fun String.expressionKey(): String =
     trim().lowercase()
+
+private data class ExpressionKeywordGroup(
+    val spriteKeys: Set<String>,
+    val keywordPatterns: List<Regex>,
+)
+
+private val expressionKeywordGroups = listOf(
+    expressionKeywordGroup(
+        spriteKeys = setOf("joy", "happy", "happiness", "smile", "smiling", "laugh", "laughing", "amusement"),
+        keywords = setOf(
+            "joy", "happy", "happiness", "smile", "smiles", "smiling", "grin", "grins", "laugh", "laughs",
+            "laughing", "delight", "delighted", "cheerful", "excited", "glad", "beams", "brightly"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("sadness", "sad", "sorrow", "crying", "cry", "tears", "grief"),
+        keywords = setOf(
+            "sad", "sadness", "sorrow", "cry", "cries", "crying", "tear", "tears", "weeps", "weeping",
+            "grief", "heartbroken", "lonely", "mournful", "dejected"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("anger", "angry", "rage", "annoyed", "irritated", "mad"),
+        keywords = setOf(
+            "anger", "angry", "rage", "furious", "annoyed", "irritated", "irritation", "mad", "glares",
+            "glare", "scowls", "scowl", "snaps", "snarls"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("fear", "scared", "afraid", "anxiety", "nervous", "worry"),
+        keywords = setOf(
+            "fear", "scared", "afraid", "frightened", "terrified", "anxious", "anxiety", "nervous",
+            "worry", "worried", "trembles", "trembling", "panic", "panicked"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("surprise", "surprised", "shock", "shocked", "amazed"),
+        keywords = setOf(
+            "surprise", "surprised", "shock", "shocked", "startled", "astonished", "amazed", "gasps",
+            "gasp", "wide-eyed", "unexpected"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("disgust", "disgusted", "gross", "revulsion"),
+        keywords = setOf(
+            "disgust", "disgusted", "gross", "revulsion", "revolted", "grimaces", "grimace", "nauseated"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("love", "loving", "affection", "caring", "admiration"),
+        keywords = setOf(
+            "love", "loving", "affection", "affectionate", "caring", "tender", "fond", "admiration", "adores",
+            "adore", "cherishes", "cherish"
+        ),
+    ),
+    expressionKeywordGroup(
+        spriteKeys = setOf("embarrassment", "embarrassed", "blush", "blushing", "shy"),
+        keywords = setOf(
+            "embarrassed", "embarrassment", "blush", "blushes", "blushing", "shy", "flustered", "bashful"
+        ),
+    ),
+)
+
+private fun expressionKeywordGroup(
+    spriteKeys: Set<String>,
+    keywords: Set<String>,
+): ExpressionKeywordGroup =
+    ExpressionKeywordGroup(
+        spriteKeys = spriteKeys,
+        keywordPatterns = keywords.map(::expressionKeywordRegex),
+    )
+
+private val explicitExpressionRegexes = listOf(
+    Regex("""(?im)^\s*(?:expression|emotion|sprite)\s*[:=]\s*["'`\[]?([A-Za-z0-9_. -]{1,48})["'`\]]?\s*$"""),
+    Regex("""(?im)[\[(]\s*(?:expression|emotion|sprite)\s*[:=]\s*["'`]?([A-Za-z0-9_. -]{1,48})["'`]?\s*[\])]"""),
+    Regex("""(?is)<(?:expression|emotion|sprite)>\s*([^<]+)\s*</(?:expression|emotion|sprite)>"""),
+)
+
+private fun findExplicitExpressionLabel(
+    replyText: String,
+    sprites: List<ExpressionSprite>,
+): ExpressionSprite? {
+    explicitExpressionRegexes.forEach { regex ->
+        regex.findAll(replyText).forEach { match ->
+            sprites.findSpriteByAnyKey(setOf(match.groupValues[1].trimExpressionToken().expressionKey()))
+                ?.let { return it }
+        }
+    }
+
+    return null
+}
+
+private fun List<ExpressionSprite>.findSpriteByAnyKey(keys: Set<String>): ExpressionSprite? =
+    firstOrNull { sprite ->
+        sprite.label.expressionKey() in keys
+    }
+
+private fun expressionKeywordRegex(keyword: String): Regex {
+    val escaped = Regex.escape(keyword)
+    return if (keyword.any { !it.isLetterOrDigit() }) {
+        Regex("""(?i)(?:^|[^\p{L}\p{N}])$escaped(?:$|[^\p{L}\p{N}])""")
+    } else {
+        Regex("""(?i)\b$escaped\b""")
+    }
+}
+
+private fun String.trimExpressionToken(): String =
+    trim().trim('"', '\'', '`', '[', ']', '(', ')', '<', '>', '.', ',', ':', ';', '!', '?')
 
 /**
  * 作者注释 (Author's Note)

@@ -8,6 +8,7 @@ import me.rerere.rikkahub.data.model.ExpressionSelectionStatus
 import me.rerere.rikkahub.data.model.chatAvatar
 import me.rerere.rikkahub.data.model.defaultExpressionLabel
 import me.rerere.rikkahub.data.model.selectExpression
+import me.rerere.rikkahub.data.model.selectExpressionFromReply
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -108,6 +109,82 @@ class AssistantImporterTest {
         val result = assistant.selectExpression("sad")
 
         assertEquals(ExpressionSelectionStatus.NOT_FOUND, result.status)
+        assertEquals(assistant, result.assistant)
+    }
+
+    @Test
+    fun `auto expression selection honors explicit emotion tag`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(
+                ExpressionSprite(label = "neutral", imageUrl = "file://neutral.png"),
+                ExpressionSprite(label = "smug", imageUrl = "file://smug.png"),
+            ),
+        )
+
+        val result = assistant.selectExpressionFromReply("emotion: smug\n*She folds her arms.*")
+
+        assertEquals(ExpressionSelectionStatus.SELECTED, result.status)
+        assertEquals("smug", result.assistant.selectedExpression)
+    }
+
+    @Test
+    fun `auto expression selection does not treat prose label mentions as explicit tags`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(
+                ExpressionSprite(label = "neutral", imageUrl = "file://neutral.png"),
+                ExpressionSprite(label = "smug", imageUrl = "file://smug.png"),
+                ExpressionSprite(label = "sadness", imageUrl = "file://sadness.png"),
+            ),
+        )
+
+        val result = assistant.selectExpressionFromReply("The archive label named smug is locked.")
+
+        assertEquals(ExpressionSelectionStatus.SELECTED, result.status)
+        assertEquals("neutral", result.assistant.selectedExpression)
+    }
+
+    @Test
+    fun `auto expression selection maps joyful replies to joy sprite`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(
+                ExpressionSprite(label = "neutral", imageUrl = "file://neutral.png"),
+                ExpressionSprite(label = "joy", imageUrl = "file://joy.png"),
+                ExpressionSprite(label = "sadness", imageUrl = "file://sadness.png"),
+            ),
+        )
+
+        val result = assistant.selectExpressionFromReply("She beams with a bright smile and laughs softly.")
+
+        assertEquals(ExpressionSelectionStatus.SELECTED, result.status)
+        assertEquals("joy", result.assistant.selectedExpression)
+    }
+
+    @Test
+    fun `auto expression selection falls back to neutral for plain replies`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(
+                ExpressionSprite(label = "neutral", imageUrl = "file://neutral.png"),
+                ExpressionSprite(label = "anger", imageUrl = "file://anger.png"),
+            ),
+            selectedExpression = "anger",
+        )
+
+        val result = assistant.selectExpressionFromReply("The archive door is locked.")
+
+        assertEquals(ExpressionSelectionStatus.SELECTED, result.status)
+        assertEquals("neutral", result.assistant.selectedExpression)
+    }
+
+    @Test
+    fun `auto expression selection can be disabled per assistant`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(ExpressionSprite(label = "joy", imageUrl = "file://joy.png")),
+            autoSelectExpression = false,
+        )
+
+        val result = assistant.selectExpressionFromReply("She smiles brightly.")
+
+        assertEquals(ExpressionSelectionStatus.IGNORED, result.status)
         assertEquals(assistant, result.assistant)
     }
 }

@@ -256,6 +256,26 @@ internal fun AssistantBasicContent(
                         }
                     }
                 }
+
+                HorizontalDivider()
+
+                FormItem(
+                    modifier = Modifier.padding(8.dp),
+                    label = {
+                        Text(stringResource(R.string.assistant_page_auto_expression))
+                    },
+                    description = {
+                        Text(stringResource(R.string.assistant_page_auto_expression_desc))
+                    },
+                    tail = {
+                        Switch(
+                            checked = assistant.autoSelectExpression,
+                            onCheckedChange = {
+                                onUpdate(assistant.copy(autoSelectExpression = it))
+                            },
+                        )
+                    },
+                )
             }
         }
 

@@ -94,10 +94,10 @@ import me.rerere.rikkahub.data.model.buildGroupInitialNodes
 import me.rerere.rikkahub.data.model.GroupGreetingMember
 import me.rerere.rikkahub.data.model.MessageNode
 import me.rerere.rikkahub.data.model.QuickMessageChatMessage
+import me.rerere.rikkahub.data.model.ExpressionSelectionStatus
+import me.rerere.rikkahub.data.model.selectExpressionFromReply
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
-import me.rerere.rikkahub.web.BadRequestException
-import me.rerere.rikkahub.web.NotFoundException
 import me.rerere.rikkahub.utils.applyPlaceholders
 import me.rerere.rikkahub.utils.sendNotification
 import me.rerere.rikkahub.utils.cancelNotification
@@ -154,6 +154,11 @@ private val outputTransformers by lazy {
         RegexOutputTransformer,
     )
 }
+
+private val expressionUpdateStatuses = setOf(
+    ExpressionSelectionStatus.SELECTED,
+    ExpressionSelectionStatus.CLEARED,
+)
 
 class ChatService(
     private val context: Application,
@@ -844,6 +849,12 @@ class ChatService(
         }.onSuccess {
             val finalConversation = getConversationFlow(conversationId).value
             saveConversation(conversationId, finalConversation)
+            scheduleAutoExpressionSelection(
+                assistant = assistant,
+                conversation = finalConversation,
+                senderId = senderId,
+                messageRange = messageRange,
+            )
 
             if (generateFollowups) {
                 launchWithConversationReference(conversationId) {
@@ -855,6 +866,56 @@ class ChatService(
             }
         }
     }
+
+    private fun scheduleAutoExpressionSelection(
+        assistant: Assistant,
+        conversation: Conversation,
+        senderId: Uuid?,
+        messageRange: ClosedRange<Int>?,
+    ) {
+        val reply = conversation.latestGeneratedAssistantReply(senderId, messageRange) ?: return
+        if (!assistant.autoSelectExpression || assistant.expressionSprites.isEmpty()) return
+
+        appScope.launch(Dispatchers.IO) {
+            val replyText = reply.toText()
+            val preview = assistant.selectExpressionFromReply(replyText)
+            if (preview.status !in expressionUpdateStatuses || preview.assistant == assistant) {
+                return@launch
+            }
+
+            settingsStore.update { current ->
+                current.copy(
+                    assistants = current.assistants.map { currentAssistant ->
+                        if (currentAssistant.id != assistant.id) {
+                            currentAssistant
+                        } else {
+                            val result = currentAssistant.selectExpressionFromReply(replyText)
+                            if (result.status in expressionUpdateStatuses) {
+                                result.assistant
+                            } else {
+                                currentAssistant
+                            }
+                        }
+                    },
+                )
+            }
+        }
+    }
+
+    private fun Conversation.latestGeneratedAssistantReply(
+        senderId: Uuid?,
+        messageRange: ClosedRange<Int>?,
+    ): UIMessage? {
+        val regeneratedIndex = messageRange?.endInclusive?.plus(1)
+        val regeneratedMessage = regeneratedIndex
+            ?.let { currentMessages.getOrNull(it) }
+            ?.takeIf { message -> message.isAssistantReplyFrom(senderId) }
+        return regeneratedMessage
+            ?: currentMessages.asReversed().firstOrNull { message -> message.isAssistantReplyFrom(senderId) }
+    }
+
+    private fun UIMessage.isAssistantReplyFrom(senderId: Uuid?): Boolean =
+        role == MessageRole.ASSISTANT && (senderId == null || this.senderId == senderId)
 
     private fun Conversation.visibleMessageNodes(): List<MessageNode> =
         messageNodes.filterNot { it.hiddenFromAi }
@@ -1395,7 +1456,7 @@ class ChatService(
             node.messages.any { it.id == messageId }
         }
         if (targetNodeIndex == -1) {
-            throw NotFoundException("Message not found")
+            throw NoSuchElementException("Message not found")
         }
 
         val copiedNodes = currentConversation.messageNodes
@@ -1434,10 +1495,10 @@ class ChatService(
     ) {
         val currentConversation = getConversationFlow(conversationId).value
         val targetNode = currentConversation.messageNodes.firstOrNull { it.id == nodeId }
-            ?: throw NotFoundException("Message node not found")
+            ?: throw NoSuchElementException("Message node not found")
 
         if (selectIndex !in targetNode.messages.indices) {
-            throw BadRequestException("Invalid selectIndex")
+            throw IllegalArgumentException("Invalid selectIndex")
         }
 
         if (targetNode.selectIndex == selectIndex) {
@@ -1465,7 +1526,7 @@ class ChatService(
 
         if (updatedConversation == null) {
             if (failIfMissing) {
-                throw NotFoundException("Message not found")
+                throw NoSuchElementException("Message not found")
             }
             return
         }

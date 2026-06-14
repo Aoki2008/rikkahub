@@ -147,6 +147,9 @@ fun SillyTavernResourcesPage(
                     onOpenDocs = {
                         context.openUrl("https://docs.sillytavern.app/extensions/")
                     },
+                    onOpenOfficialExtensions = {
+                        context.openUrl("https://github.com/SillyTavern/SillyTavern/tree/release/public/scripts/extensions")
+                    },
                 )
             }
 
@@ -251,6 +254,21 @@ private val SillyTavernExtensionCatalog = listOf(
         description = "Runs on user/assistant text with JS regex compatibility normalization.",
     ),
     SillyTavernExtensionCompat(
+        name = "Token Counter",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Chat size and context counters are available from native chat tooling.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Summarize",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Long chats can be compressed into summary nodes without leaving the chat screen.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Chat Vectorization",
+        status = SillyTavernExtensionStatus.Partial,
+        description = "Recent-chat reference and lorebook scanning cover common retrieval flows; vector stores are not one-to-one yet.",
+    ),
+    SillyTavernExtensionCompat(
         name = "Prompt Presets",
         status = SillyTavernExtensionStatus.Native,
         description = "Chat Completion and Text Completion presets bind into the prompt manager.",
@@ -268,12 +286,27 @@ private val SillyTavernExtensionCatalog = listOf(
     SillyTavernExtensionCompat(
         name = "Sprites / Character Expressions",
         status = SillyTavernExtensionStatus.Native,
-        description = "Official sprite folders import as native expression images and can be selected manually or by Quick Reply.",
+        description = "Official sprite folders import as native expression images and can be selected manually, by Quick Reply, or after replies.",
     ),
     SillyTavernExtensionCompat(
         name = "Backgrounds",
         status = SillyTavernExtensionStatus.Native,
         description = "Official background assets import as the current character chat background.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Image Captioning",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Image attachments are transformed through the native multimodal/OCR pipeline before generation.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Web Search / Weather / RSS",
+        status = SillyTavernExtensionStatus.Partial,
+        description = "Native web search tools exist; weather and RSS slash-command parity still need dedicated mappings.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Variables / STScript",
+        status = SillyTavernExtensionStatus.Partial,
+        description = "Quick Reply variables and core STScript-style commands are supported; arbitrary browser extension APIs are not.",
     ),
     SillyTavernExtensionCompat(
         name = "TTS",
@@ -290,6 +323,7 @@ private val SillyTavernExtensionCatalog = listOf(
 @Composable
 private fun ExtensionCompatibilitySection(
     onOpenDocs: () -> Unit,
+    onOpenOfficialExtensions: () -> Unit,
 ) {
     CardGroup(
         title = { Text(stringResource(R.string.st_resources_extension_section)) },
@@ -299,6 +333,12 @@ private fun ExtensionCompatibilitySection(
             leadingContent = { Icon(HugeIcons.Puzzle, null) },
             headlineContent = { Text(stringResource(R.string.st_resources_open_extension_docs)) },
             supportingContent = { Text(stringResource(R.string.st_resources_open_extension_docs_desc)) },
+        )
+        item(
+            onClick = onOpenOfficialExtensions,
+            leadingContent = { Icon(HugeIcons.Puzzle, null) },
+            headlineContent = { Text(stringResource(R.string.st_resources_open_official_extensions)) },
+            supportingContent = { Text(stringResource(R.string.st_resources_open_official_extensions_desc)) },
         )
         SillyTavernExtensionCatalog.forEach { extension ->
             item(

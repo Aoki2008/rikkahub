@@ -11,6 +11,10 @@ class UpdateCheckerTest {
             "https://api.github.com/repos/Aoki2008/rikkahub/releases/latest",
             AppLinks.RELEASES_API_URL,
         )
+        assertEquals(
+            "https://github.com/Aoki2008/rikkahub/releases",
+            AppLinks.RELEASES_URL,
+        )
     }
 
     @Test

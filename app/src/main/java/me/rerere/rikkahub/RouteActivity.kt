@@ -116,7 +116,6 @@ import me.rerere.rikkahub.ui.pages.setting.SettingProviderPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchDetailPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSearchPage
 import me.rerere.rikkahub.ui.pages.setting.SettingSpeechPage
-import me.rerere.rikkahub.ui.pages.setting.SettingWebPage
 import me.rerere.rikkahub.ui.pages.share.handler.ShareHandlerPage
 import me.rerere.rikkahub.ui.pages.stats.StatsPage
 import me.rerere.rikkahub.ui.pages.translator.TranslatorPage
@@ -460,12 +459,6 @@ class RouteActivity : ComponentActivity() {
 
                             entry<Screen.SettingFiles> {
                                 SettingFilesPage()
-                            }
-
-                            if (AppFeatures.WEB_SERVER) {
-                                entry<Screen.SettingWeb> {
-                                    SettingWebPage()
-                                }
                             }
 
                             entry<Screen.Developer> {

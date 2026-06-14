@@ -154,7 +154,10 @@ class SillyTavernRegexParserTest {
               "disabled": false
             }
         """.trimIndent()
-        val assistant = Assistant(regexes = parseSillyTavernRegexScripts(json.parseToJsonElement(raw)))
+        val regexes = parseSillyTavernRegexScripts(json.parseToJsonElement(raw))
+        val assistant = Assistant(regexes = regexes)
+
+        assertEquals("\\{\\{//[\\s\\S]*?\\}\\}", regexes.single().findRegex)
 
         val result = "hello {{//hidden note}}there".replaceRegexes(
             assistant = assistant,

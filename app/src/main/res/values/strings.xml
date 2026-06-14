@@ -6,6 +6,8 @@
   <string name="about_page_title">About</string>
   <string name="about_page_version">Version</string>
   <string name="about_page_website">Project</string>
+  <string name="about_page_readme">README</string>
+  <string name="about_page_releases">Releases</string>
   <string name="add">Add</string>
   <string name="app_name">RikkaHub ST</string>
   <string name="asr_button_content_description">Speech Recognition</string>
@@ -75,6 +77,8 @@
   <string name="assistant_page_expression_default">Default avatar</string>
   <string name="assistant_page_expression_sprites">Expression sprites</string>
   <string name="assistant_page_expression_sprites_desc">%d SillyTavern expression image(s) are available for this character</string>
+  <string name="assistant_page_auto_expression">Auto expression switching</string>
+  <string name="assistant_page_auto_expression_desc">Switch expression sprites after assistant replies using explicit emotion tags or lightweight emotion matching</string>
   <string name="assistant_page_delete">Delete</string>
   <string name="assistant_page_delete_body">Delete Body</string>
   <string name="assistant_page_delete_dialog_text">Are you sure you want to delete this assistant? This action cannot be undone.</string>
@@ -846,7 +850,7 @@
   <string name="setting_page_search_title">Search Service</string>
   <string name="setting_page_share">Share</string>
   <string name="setting_page_share_desc">Share this app with friends</string>
-  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nProject: https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity</string>
+  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nProject: https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity\nReleases: https://github.com/Aoki2008/rikkahub/releases</string>
   <string name="setting_page_sponsor_alert_confirm">Donate</string>
   <string name="setting_page_sponsor_alert_desc">You have launched the app over 100 times! If you enjoy using it, please consider supporting the developer.</string>
   <string name="setting_page_sponsor_alert_dismiss">Not Now</string>
@@ -1041,6 +1045,8 @@
   <string name="st_resources_market_section_with_count">Official Assets (%1$d/%2$d)</string>
   <string name="st_resources_open_extension_docs">Open SillyTavern Extension Docs</string>
   <string name="st_resources_open_extension_docs_desc">Use as a compatibility reference; browser JS extensions must be mapped to native Android features</string>
+  <string name="st_resources_open_official_extensions">Open Official Extension Source</string>
+  <string name="st_resources_open_official_extensions_desc">Review built-in SillyTavern extension behavior for native compatibility mapping</string>
   <string name="st_resources_page_title">SillyTavern Resources</string>
   <string name="st_resources_search_placeholder">Search by name, type, or filename</string>
   <string name="skills_page_add_title">Add Skill</string>
