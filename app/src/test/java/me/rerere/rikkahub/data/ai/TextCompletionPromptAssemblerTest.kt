@@ -122,8 +122,7 @@ class TextCompletionPromptAssemblerTest {
         assertEquals(
             listOf(
                 "<|user Alice Mira|>",
-                "Alice: Hello<END Alice>",
-                "<|assistant Mira Alice|>",
+                "Alice: Hello<END Alice><|assistant Mira Alice|>",
                 "Mira: Hi",
             ).joinToString("\n") + "\n",
             history,
