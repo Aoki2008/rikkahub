@@ -97,4 +97,80 @@ class TextCompletionPresetParserTest {
         assertEquals("Act as {{char}}", preset.content)
         assertEquals("Stay in character", preset.postHistory)
     }
+
+    @Test
+    fun `classify text completion preset file as context preset`() {
+        val raw = """
+            {
+              "story_string":"{{#if system}}{{system}}{{/if}}{{trim}}",
+              "example_separator":"",
+              "chat_start":"",
+              "name":"Alpaca"
+            }
+        """.trimIndent()
+
+        val imported = parseSillyTavernTextCompletionPreset(
+            json.parseToJsonElement(raw).jsonObject,
+            "Fallback",
+        )
+
+        val context = imported as TextCompletionPresetImport.Context
+        assertEquals("Alpaca", context.preset.name)
+        assertEquals("{{#if system}}{{system}}{{/if}}{{trim}}", context.preset.storyString)
+    }
+
+    @Test
+    fun `classify text completion preset file as instruct preset`() {
+        val raw = """
+            {
+              "input_sequence":"### Instruction:",
+              "output_sequence":"### Response:",
+              "names_behavior":"force",
+              "name":"Alpaca"
+            }
+        """.trimIndent()
+
+        val imported = parseSillyTavernTextCompletionPreset(
+            json.parseToJsonElement(raw).jsonObject,
+            "Fallback",
+        )
+
+        val instruct = imported as TextCompletionPresetImport.Instruct
+        assertEquals("Alpaca", instruct.preset.name)
+        assertEquals("### Instruction:", instruct.preset.inputSequence)
+        assertEquals("### Response:", instruct.preset.outputSequence)
+    }
+
+    @Test
+    fun `classify text completion preset file as system prompt preset`() {
+        val raw = """
+            {
+              "name":"Actor",
+              "content":"Act as {{char}}",
+              "post_history":"Stay in character"
+            }
+        """.trimIndent()
+
+        val imported = parseSillyTavernTextCompletionPreset(
+            json.parseToJsonElement(raw).jsonObject,
+            "Fallback",
+        )
+
+        val systemPrompt = imported as TextCompletionPresetImport.SystemPrompt
+        assertEquals("Actor", systemPrompt.preset.name)
+        assertEquals("Act as {{char}}", systemPrompt.preset.content)
+        assertEquals("Stay in character", systemPrompt.preset.postHistory)
+    }
+
+    @Test
+    fun `reject unknown text completion preset shape`() {
+        val raw = """{"name":"Not a preset","temperature":0.7}"""
+
+        val imported = parseSillyTavernTextCompletionPreset(
+            json.parseToJsonElement(raw).jsonObject,
+            "Fallback",
+        )
+
+        assertTrue(imported is TextCompletionPresetImport.Unknown)
+    }
 }
