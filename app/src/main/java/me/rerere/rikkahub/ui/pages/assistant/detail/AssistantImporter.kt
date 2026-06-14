@@ -47,6 +47,7 @@ import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.SelectiveLogic
+import me.rerere.rikkahub.data.model.parseSillyTavernRegexScripts
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.ui.components.ui.AutoAIIcon
 import me.rerere.rikkahub.ui.context.LocalToaster
@@ -232,6 +233,7 @@ private fun parseTavernCard(
     val characterBook = data["character_book"]?.let { runCatching { it.jsonObject }.getOrNull() }
     val depthPromptEntry = parseDepthPrompt(data)
     val postHistoryEntry = parsePostHistory(postHistory)
+    val regexScripts = parseSillyTavernRegexScripts(data)
 
     val bookEntries = buildList {
         characterBook?.let { addAll(parseCharacterBookEntries(it)) }
@@ -260,6 +262,7 @@ private fun parseTavernCard(
         } else emptyList(),
         systemPrompt = systemPrompt,
         background = background,
+        regexes = regexScripts,
         lorebookIds = lorebook?.let { setOf(it.id) } ?: emptySet(),
         // 绑定内置默认预设，使角色卡字段经 Prompt Manager 的 marker 正确组装，
         // 而非拍扁进单个 systemPrompt

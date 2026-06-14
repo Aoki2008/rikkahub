@@ -116,6 +116,7 @@ data class AssistantRegex(
     val enabled: Boolean = true,
     val findRegex: String = "", // 正则表达式
     val replaceString: String = "", // 替换字符串
+    val trimStrings: List<String> = emptyList(), // SillyTavern regex back-reference trim strings
     val affectingScope: Set<AssistantAffectScope> = setOf(),
     val visualOnly: Boolean = false, // 是否仅在视觉上影响
 )
@@ -128,12 +129,24 @@ fun String.replaceRegexes(
     if (assistant == null) return this
     if (assistant.regexes.isEmpty()) return this
     return assistant.regexes.fold(this) { acc, regex ->
-        if (regex.enabled && regex.visualOnly == visual && regex.affectingScope.contains(scope)) {
+        if (
+            regex.enabled &&
+            regex.findRegex.isNotBlank() &&
+            regex.visualOnly == visual &&
+            regex.affectingScope.contains(scope)
+        ) {
             try {
-                val result = acc.replace(
-                    regex = Regex(regex.findRegex),
-                    replacement = regex.replaceString,
-                )
+                val compiledRegex = Regex(regex.findRegex)
+                val result = if (regex.trimStrings.isEmpty()) {
+                    acc.replace(
+                        regex = compiledRegex,
+                        replacement = regex.replaceString,
+                    )
+                } else {
+                    compiledRegex.replace(acc) { match ->
+                        expandRegexReplacement(regex.replaceString, match, regex.trimStrings)
+                    }
+                }
                 // println("Regex: ${regex.findRegex} -> ${result}")
                 result
             } catch (e: Exception) {
@@ -146,6 +159,69 @@ fun String.replaceRegexes(
         }
     }
 }
+
+private fun expandRegexReplacement(
+    replacement: String,
+    match: MatchResult,
+    trimStrings: List<String>,
+): String {
+    val normalizedReplacement = replacement
+        .replace(Regex("\\{\\{match}}", RegexOption.IGNORE_CASE), "\$0")
+        .replace(Regex("\\$<([A-Za-z][A-Za-z0-9_]*)>")) { "\${${it.groupValues[1]}}" }
+    val result = StringBuilder()
+    var index = 0
+
+    while (index < normalizedReplacement.length) {
+        val char = normalizedReplacement[index]
+        if (char != '$' || index == normalizedReplacement.lastIndex) {
+            result.append(char)
+            index++
+            continue
+        }
+
+        val next = normalizedReplacement[index + 1]
+        when {
+            next == '{' -> {
+                val end = normalizedReplacement.indexOf('}', startIndex = index + 2)
+                if (end == -1) {
+                    result.append(char)
+                    index++
+                } else {
+                    val name = normalizedReplacement.substring(index + 2, end)
+                    result.append(match.groupValue(name)?.trimRegexMatch(trimStrings).orEmpty())
+                    index = end + 1
+                }
+            }
+
+            next.isDigit() -> {
+                val start = index + 1
+                var end = start
+                while (end < normalizedReplacement.length && normalizedReplacement[end].isDigit()) {
+                    end++
+                }
+                val groupIndex = normalizedReplacement.substring(start, end).toIntOrNull()
+                result.append(groupIndex?.let(match::groupValue)?.trimRegexMatch(trimStrings).orEmpty())
+                index = end
+            }
+
+            else -> {
+                result.append(char)
+                index++
+            }
+        }
+    }
+
+    return result.toString()
+}
+
+private fun MatchResult.groupValue(index: Int): String? =
+    runCatching { groups[index]?.value }.getOrNull()
+
+private fun MatchResult.groupValue(name: String): String? =
+    runCatching { groups[name]?.value }.getOrNull()
+
+private fun String.trimRegexMatch(trimStrings: List<String>): String =
+    trimStrings.fold(this) { acc, trimString -> acc.replace(trimString, "") }
 
 /**
  * 注入位置

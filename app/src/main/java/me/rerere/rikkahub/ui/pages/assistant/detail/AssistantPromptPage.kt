@@ -1,11 +1,14 @@
 package me.rerere.rikkahub.ui.pages.assistant.detail
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import me.rerere.hugeicons.HugeIcons
 import me.rerere.hugeicons.stroke.ArrowDown01
 import me.rerere.hugeicons.stroke.ArrowUp01
 import me.rerere.hugeicons.stroke.Add01
 import me.rerere.hugeicons.stroke.Delete01
 import me.rerere.hugeicons.stroke.Cancel01
+import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.hugeicons.stroke.Refresh03
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -33,6 +36,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LargeFlexibleTopAppBar
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
@@ -45,6 +49,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -63,6 +68,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dokar.sonner.ToastType
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
 import me.rerere.ai.core.MessageRole
 import me.rerere.ai.provider.Model
 import me.rerere.ai.ui.UIMessage
@@ -77,6 +87,7 @@ import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.AuthorsNote
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.parseSillyTavernRegexScripts
 import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.ui.components.message.ChatMessage
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -84,6 +95,7 @@ import me.rerere.rikkahub.ui.components.ui.FormItem
 import me.rerere.rikkahub.ui.components.ui.Select
 import me.rerere.rikkahub.ui.components.ui.Tag
 import me.rerere.rikkahub.ui.components.ui.TextArea
+import me.rerere.rikkahub.ui.context.LocalToaster
 import me.rerere.rikkahub.ui.theme.ChatFontProvider
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.ui.theme.JetbrainsMono
@@ -534,6 +546,11 @@ private fun AssistantPromptContent(
                 verticalArrangement = Arrangement.spacedBy(16.dp),
                 modifier = Modifier.padding(horizontal = 8.dp)
             ) {
+                SillyTavernRegexImportButton(
+                    assistant = assistant,
+                    onUpdate = onUpdate,
+                    modifier = Modifier.fillMaxWidth(),
+                )
                 assistant.regexes.fastForEachIndexed { index, regex ->
                     AssistantRegexCard(
                         regex = regex,
@@ -625,6 +642,51 @@ private fun AuthorsNoteCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SillyTavernRegexImportButton(
+    assistant: Assistant,
+    onUpdate: (Assistant) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val toaster = LocalToaster.current
+    val scope = rememberCoroutineScope()
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument(),
+    ) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                val jsonText = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.bufferedReader()
+                        .use { it?.readText() }
+                        ?: error("Cannot read file")
+                }
+                val importedRegexes = parseSillyTavernRegexScripts(Json.parseToJsonElement(jsonText))
+                if (importedRegexes.isEmpty()) {
+                    error("No SillyTavern regex scripts found")
+                }
+                onUpdate(assistant.copy(regexes = assistant.regexes + importedRegexes))
+                importedRegexes.size
+            }.onSuccess { count ->
+                toaster.show("Imported $count regex rule(s)", type = ToastType.Success)
+            }.onFailure { error ->
+                error.printStackTrace()
+                toaster.show(error.message ?: "Import failed", type = ToastType.Error)
+            }
+        }
+    }
+
+    OutlinedButton(
+        onClick = { importLauncher.launch(arrayOf("application/json", "application/octet-stream", "*/*")) },
+        modifier = modifier,
+    ) {
+        Icon(HugeIcons.FileImport, null)
+        Spacer(modifier = Modifier.width(8.dp))
+        Text("Import SillyTavern regex JSON")
     }
 }
 
