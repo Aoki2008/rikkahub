@@ -4,7 +4,10 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.rikkahub.data.ai.PromptAssemblyInput
 import me.rerere.rikkahub.data.ai.PromptManagerAssembler
+import me.rerere.rikkahub.data.datastore.Settings
+import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.InjectionPosition
+import kotlin.uuid.Uuid
 
 /**
  * Chat Completion 预设（酒馆预设）组装转换器。
@@ -21,46 +24,66 @@ object PromptManagerTransformer : InputMessageTransformer {
     override suspend fun transform(
         ctx: TransformerContext,
         messages: List<UIMessage>,
-    ): List<UIMessage> {
-        val presetId = ctx.assistant.promptPresetId ?: return messages
-        val preset = ctx.settings.promptPresets.firstOrNull { it.id == presetId } ?: return messages
-
-        // 聊天记录 = 去掉(由 systemPrompt 生成的)系统消息后的全部消息
-        val chatHistory = messages.filterNot { it.role == MessageRole.SYSTEM }
-        val card = ctx.assistant.characterCard
-
-        val persona = ctx.settings.selectedPersonaId
-            ?.let { id -> ctx.settings.personas.firstOrNull { it.id == id } }
-            ?.takeIf { it.enabled }
-
-        // 复用既有世界书激活逻辑，按位置拆分为 before / after
-        val injections = collectInjections(
-            messages = chatHistory,
-            assistant = ctx.assistant,
-            modeInjections = ctx.settings.modeInjections,
-            lorebooks = ctx.settings.lorebooks,
-            conversationModeInjectionIds = ctx.conversationModeInjectionIds,
-            conversationLorebookIds = ctx.conversationLorebookIds,
-        )
-        val before = injections
-            .filter { it.position == InjectionPosition.BEFORE_SYSTEM_PROMPT }
-            .map { it.content }
-        val after = injections
-            .filter { it.position != InjectionPosition.BEFORE_SYSTEM_PROMPT }
-            .map { it.content }
-
-        return PromptManagerAssembler.assemble(
-            PromptAssemblyInput(
-                preset = preset,
-                description = card?.description.orEmpty(),
-                personality = card?.personality.orEmpty(),
-                scenario = card?.scenario.orEmpty(),
-                exampleMessages = card?.mesExample.orEmpty(),
-                personaDescription = persona?.description.orEmpty(),
-                worldInfoBefore = before,
-                worldInfoAfter = after,
-                chatHistory = chatHistory,
-            )
-        )
-    }
+    ): List<UIMessage> = buildPromptManagerMessages(
+        assistant = ctx.assistant,
+        settings = ctx.settings,
+        messages = messages,
+        conversationModeInjectionIds = ctx.conversationModeInjectionIds,
+        conversationLorebookIds = ctx.conversationLorebookIds,
+    ) ?: messages
 }
+
+/**
+ * 核心组装逻辑（纯函数，便于测试）。
+ *
+ * @return 绑定了预设时返回组装后的消息列表；未绑定/找不到预设时返回 null（调用方保持原样）。
+ */
+internal fun buildPromptManagerMessages(
+    assistant: Assistant,
+    settings: Settings,
+    messages: List<UIMessage>,
+    conversationModeInjectionIds: Set<Uuid> = emptySet(),
+    conversationLorebookIds: Set<Uuid> = emptySet(),
+): List<UIMessage>? {
+    val presetId = assistant.promptPresetId ?: return null
+    val preset = settings.promptPresets.firstOrNull { it.id == presetId } ?: return null
+
+    // 聊天记录 = 去掉(由 systemPrompt 生成的)系统消息后的全部消息
+    val chatHistory = messages.filterNot { it.role == MessageRole.SYSTEM }
+    val card = assistant.characterCard
+
+    val persona = settings.selectedPersonaId
+        ?.let { id -> settings.personas.firstOrNull { it.id == id } }
+        ?.takeIf { it.enabled }
+
+    // 复用既有世界书激活逻辑，按位置拆分为 before / after
+    val injections = collectInjections(
+        messages = chatHistory,
+        assistant = assistant,
+        modeInjections = settings.modeInjections,
+        lorebooks = settings.lorebooks,
+        conversationModeInjectionIds = conversationModeInjectionIds,
+        conversationLorebookIds = conversationLorebookIds,
+    )
+    val before = injections
+        .filter { it.position == InjectionPosition.BEFORE_SYSTEM_PROMPT }
+        .map { it.content }
+    val after = injections
+        .filter { it.position != InjectionPosition.BEFORE_SYSTEM_PROMPT }
+        .map { it.content }
+
+    return PromptManagerAssembler.assemble(
+        PromptAssemblyInput(
+            preset = preset,
+            description = card?.description.orEmpty(),
+            personality = card?.personality.orEmpty(),
+            scenario = card?.scenario.orEmpty(),
+            exampleMessages = card?.mesExample.orEmpty(),
+            personaDescription = persona?.description.orEmpty(),
+            worldInfoBefore = before,
+            worldInfoAfter = after,
+            chatHistory = chatHistory,
+        )
+    )
+}
+
