@@ -6,9 +6,11 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import me.rerere.ai.core.MessageRole
 import me.rerere.rikkahub.data.export.parseSillyTavernLorebook
 
 private const val SILLY_TAVERN_CONTENT_BASE_URL =
@@ -30,6 +32,7 @@ data class SillyTavernResourceImport(
     val lorebooks: List<Lorebook> = emptyList(),
     val quickMessages: List<QuickMessage> = emptyList(),
     val regexes: List<AssistantRegex> = emptyList(),
+    val personas: List<SillyTavernPersonaResource> = emptyList(),
 ) {
     val globalResourceCount: Int
         get() = promptPresets.size +
@@ -38,7 +41,8 @@ data class SillyTavernResourceImport(
             systemPromptPresets.size +
             reasoningPresets.size +
             lorebooks.size +
-            quickMessages.size
+            quickMessages.size +
+            personas.size
 
     val detectedResourceCount: Int
         get() = globalResourceCount + regexes.size
@@ -53,8 +57,15 @@ data class SillyTavernResourceImport(
             lorebooks = lorebooks + other.lorebooks,
             quickMessages = quickMessages + other.quickMessages,
             regexes = regexes + other.regexes,
+            personas = personas + other.personas,
         )
 }
+
+data class SillyTavernPersonaResource(
+    val sourceId: String,
+    val persona: Persona,
+    val defaultSelected: Boolean = false,
+)
 
 data class SillyTavernMarketAsset(
     val filename: String,
@@ -119,6 +130,9 @@ private fun parseSillyTavernResourceObject(
     fallbackName: String,
 ): SillyTavernResourceImport {
     parseExplicitExportObject(json, fallbackName)?.let { return it }
+    parseSillyTavernPersonaBackup(json)?.let { personas ->
+        return SillyTavernResourceImport(personas = personas)
+    }
 
     val name = json.stringValue("name")
         ?: json.stringValue("display_name")
@@ -194,10 +208,45 @@ private fun parseExplicitExportObject(
             regexes = parseSillyTavernRegexScripts(data)
         )
 
+        "persona", "personas" -> data.asObjectOrNull()
+            ?.let(::parseSillyTavernPersonaBackup)
+            ?.let { SillyTavernResourceImport(personas = it) }
+
         else -> parseSillyTavernResourceElement(data, name).takeIf {
             it.detectedResourceCount > 0
         }
     }
+}
+
+private fun parseSillyTavernPersonaBackup(json: JsonObject): List<SillyTavernPersonaResource>? {
+    val personas = json["personas"]?.asObjectOrNull() ?: return null
+    val descriptions = json["persona_descriptions"]?.asObjectOrNull()
+    val defaultPersona = json.stringValue("default_persona")
+
+    return personas.mapNotNull { (sourceId, nameElement) ->
+        val normalizedSourceId = sourceId.trim()
+        if (normalizedSourceId.isBlank()) return@mapNotNull null
+
+        val descriptor = descriptions?.get(sourceId)?.asObjectOrNull()
+        val position = descriptor?.intValue("position")
+        val name = nameElement.contentStringOrNull()
+            ?.trim()
+            ?.ifBlank { null }
+            ?: "[Unnamed Persona]"
+
+        SillyTavernPersonaResource(
+            sourceId = normalizedSourceId,
+            persona = Persona(
+                name = name,
+                description = descriptor?.stringValue("description").orEmpty(),
+                enabled = position != 9,
+                position = position.toPersonaInjectionPosition(),
+                injectDepth = descriptor?.intValue("depth") ?: 2,
+                role = descriptor?.intValue("role").toPersonaRole(),
+            ),
+            defaultSelected = sourceId == defaultPersona,
+        )
+    }.takeIf { it.isNotEmpty() }
 }
 
 private fun parsePromptPresetOrNull(json: JsonObject, fallbackName: String): PromptPreset? {
@@ -277,9 +326,25 @@ private val SillyTavernCompatibleAssetTypes = setOf(
     "regex",
     "regex_scripts",
     "character",
+    "persona",
+    "personas",
     "sprites",
     "extension",
 )
+
+private fun Int?.toPersonaInjectionPosition(): InjectionPosition =
+    when (this) {
+        2 -> InjectionPosition.TOP_OF_CHAT
+        3 -> InjectionPosition.BOTTOM_OF_CHAT
+        4 -> InjectionPosition.AT_DEPTH
+        else -> InjectionPosition.AFTER_SYSTEM_PROMPT
+    }
+
+private fun Int?.toPersonaRole(): MessageRole =
+    when (this) {
+        2 -> MessageRole.ASSISTANT
+        else -> MessageRole.USER
+    }
 
 private val SillyTavernSpriteImageExtensions = setOf("png", "jpg", "jpeg", "webp", "gif")
 
@@ -290,10 +355,17 @@ private fun String.toUrlPath(): String =
 
 private fun JsonObject.stringValue(vararg keys: String): String? =
     keys.firstNotNullOfOrNull { key ->
-        this[key]?.let { element ->
-            runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
-        }
+        this[key]?.contentStringOrNull()
     }
+
+private fun JsonObject.intValue(key: String): Int? =
+    this[key]?.let { element ->
+        runCatching { element.jsonPrimitive.intOrNull }.getOrNull()
+            ?: element.contentStringOrNull()?.toIntOrNull()
+    }
+
+private fun JsonElement.contentStringOrNull(): String? =
+    runCatching { jsonPrimitive.contentOrNull }.getOrNull()
 
 private fun JsonObject.hasSupportedSamplerPresetFields(): Boolean =
     keys.any {

@@ -78,6 +78,7 @@ data class SillyTavernImportReport(
         if (resources.lorebooks.isNotEmpty()) add("lorebooks ${resources.lorebooks.size}")
         if (resources.quickMessages.isNotEmpty()) add("quick replies ${resources.quickMessages.size}")
         if (resources.regexes.isNotEmpty()) add("regex scripts ${resources.regexes.size}")
+        if (resources.personas.isNotEmpty()) add("personas ${resources.personas.size}")
     }.joinToString()
 }
 
@@ -360,6 +361,17 @@ class SillyTavernResourcesVM(
 
     private suspend fun applyResources(resources: SillyTavernResourceImport) {
         settingsStore.update { settings ->
+            val incomingPersonas = resources.personas.map { it.persona }
+            val mergedPersonas = settings.personas.mergeDistinctByName(incomingPersonas) { it.name }
+            val selectedPersonaId = resources.personas
+                .firstOrNull { it.defaultSelected }
+                ?.let { defaultPersona ->
+                    mergedPersonas.firstOrNull { persona ->
+                        persona.name.equals(defaultPersona.persona.name, ignoreCase = true)
+                    }?.id
+                }
+                ?: settings.selectedPersonaId
+
             settings.copy(
                 promptPresets = settings.promptPresets.mergeDistinctByName(resources.promptPresets) { it.name },
                 contextPresets = settings.contextPresets.mergeDistinctByName(resources.contextPresets) { it.name },
@@ -368,6 +380,8 @@ class SillyTavernResourcesVM(
                 reasoningPresets = settings.reasoningPresets.mergeDistinctByName(resources.reasoningPresets) { it.name },
                 lorebooks = settings.lorebooks.mergeDistinctByName(resources.lorebooks) { it.name },
                 quickMessages = settings.quickMessages.mergeDistinctQuickMessages(resources.quickMessages),
+                personas = mergedPersonas,
+                selectedPersonaId = selectedPersonaId,
                 assistants = if (resources.regexes.isEmpty()) {
                     settings.assistants
                 } else {

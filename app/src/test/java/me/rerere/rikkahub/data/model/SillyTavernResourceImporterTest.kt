@@ -1,6 +1,8 @@
 package me.rerere.rikkahub.data.model
 
+import me.rerere.ai.core.MessageRole
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -94,6 +96,53 @@ class SillyTavernResourceImporterTest {
         assertEquals(512, sampler.maxTokens)
         assertTrue(sampler.prompts.isEmpty())
         assertEquals("<think>", result.reasoningPresets.single().prefix)
+    }
+
+    @Test
+    fun `parse SillyTavern persona backup maps personas and default selection`() {
+        val result = parseSillyTavernResources(
+            jsonText = """
+            {
+              "personas": {
+                "hero.png": "Hero",
+                "observer.png": ""
+              },
+              "persona_descriptions": {
+                "hero.png": {
+                  "description": "A careful scout who speaks plainly.",
+                  "position": 4,
+                  "depth": 3,
+                  "role": 2,
+                  "title": "Display only",
+                  "connections": [{"type": "character", "id": "alice.png"}]
+                },
+                "observer.png": {
+                  "description": "Disabled observer.",
+                  "position": 9
+                }
+              },
+              "default_persona": "hero.png"
+            }
+            """.trimIndent(),
+            fallbackName = "personas",
+        )
+
+        assertEquals(2, result.personas.size)
+        assertEquals(2, result.globalResourceCount)
+        assertEquals(2, result.detectedResourceCount)
+
+        val hero = result.personas.single { it.sourceId == "hero.png" }
+        assertEquals("Hero", hero.persona.name)
+        assertEquals("A careful scout who speaks plainly.", hero.persona.description)
+        assertEquals(InjectionPosition.AT_DEPTH, hero.persona.position)
+        assertEquals(3, hero.persona.injectDepth)
+        assertEquals(MessageRole.ASSISTANT, hero.persona.role)
+        assertTrue(hero.defaultSelected)
+
+        val observer = result.personas.single { it.sourceId == "observer.png" }
+        assertEquals("[Unnamed Persona]", observer.persona.name)
+        assertFalse(observer.persona.enabled)
+        assertEquals(InjectionPosition.AFTER_SYSTEM_PROMPT, observer.persona.position)
     }
 
     @Test
