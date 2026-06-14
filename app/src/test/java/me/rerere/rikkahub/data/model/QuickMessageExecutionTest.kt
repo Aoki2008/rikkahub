@@ -107,4 +107,57 @@ class QuickMessageExecutionTest {
         assertEquals("Ask {{char}} about the sealed gate.", plan.inputText)
         assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
     }
+
+    @Test
+    fun `pass command writes to pipe and pipe macro renders in later command`() {
+        val quickMessage = QuickMessage(
+            title = "Pipe template",
+            content = "/pass the sealed gate | /setinput Ask {{char}} about {{pipe}}.",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals("Ask {{char}} about the sealed gate.", plan.inputText)
+        assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
+    }
+
+    @Test
+    fun `echo command emits toast message without changing input`() {
+        val quickMessage = QuickMessage(
+            title = "Notify",
+            content = "/pass Objective updated | /echo severity=success {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "Keep this draft",
+        )
+
+        assertEquals("Keep this draft", plan.inputText)
+        assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
+        assertEquals(listOf("Objective updated"), plan.toastMessages)
+    }
+
+    @Test
+    fun `unsupported slash command is reported while compatible commands still run`() {
+        val quickMessage = QuickMessage(
+            title = "Mixed",
+            content = "/pass hallway | /imagine {{pipe}} | /setinput Search {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals("Search hallway", plan.inputText)
+        assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
+        assertEquals(listOf("/imagine"), plan.unsupportedCommands)
+    }
 }

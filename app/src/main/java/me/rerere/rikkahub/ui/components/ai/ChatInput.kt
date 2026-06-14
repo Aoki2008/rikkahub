@@ -734,6 +734,8 @@ private fun QuickMessageButton(
     onSendMessageWithoutAnswer: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val toaster = LocalToaster.current
+    val unsupportedCommandMessage = stringResource(R.string.quick_messages_unsupported_command)
     IconButton(
         onClick = {
             expanded = !expanded
@@ -754,6 +756,15 @@ private fun QuickMessageButton(
                             currentInput = state.textContent.text.toString(),
                         )
                         state.setMessageText(plan.inputText)
+                        plan.toastMessages.forEach { message ->
+                            toaster.show(message = message)
+                        }
+                        plan.unsupportedCommands.forEach { command ->
+                            toaster.show(
+                                message = unsupportedCommandMessage.format(command),
+                                type = ToastType.Warning,
+                            )
+                        }
                         expanded = false
                         when (plan.sendMode) {
                             QuickMessageSendMode.NONE -> Unit

@@ -4,6 +4,7 @@ data class QuickMessageExecutionPlan(
     val inputText: String,
     val sendMode: QuickMessageSendMode,
     val unsupportedCommands: List<String> = emptyList(),
+    val toastMessages: List<String> = emptyList(),
 )
 
 enum class QuickMessageSendMode {
@@ -19,7 +20,7 @@ fun buildQuickMessageExecutionPlan(
     val input = composeQuickMessageInput(quickMessage, currentInput)
 
     if (quickMessage.sendImmediately && input.trimStart().startsWith("/")) {
-        executeQuickMessageSlashCommands(input)?.let { return it }
+        executeQuickMessageSlashCommands(input, currentInput)?.let { return it }
         return QuickMessageExecutionPlan(
             inputText = input,
             sendMode = QuickMessageSendMode.NONE,
@@ -59,11 +60,14 @@ private fun joinQuickReplyInput(first: String, second: String): String =
         .filter { it.isNotEmpty() }
         .joinToString(" ")
 
-private fun executeQuickMessageSlashCommands(input: String): QuickMessageExecutionPlan? {
+private fun executeQuickMessageSlashCommands(input: String, currentInput: String): QuickMessageExecutionPlan? {
     var inputText = ""
     var pipe = ""
     var sendMode = QuickMessageSendMode.NONE
+    var hasCompatibleCommand = false
+    var hasInputUpdate = false
     val unsupported = mutableListOf<String>()
+    val toastMessages = mutableListOf<String>()
 
     for (commandText in splitSlashPipeline(input)) {
         val command = parseSlashCommand(commandText)
@@ -72,45 +76,70 @@ private fun executeQuickMessageSlashCommands(input: String): QuickMessageExecuti
             continue
         }
 
-        val args = stripLeadingNamedArguments(command.args).trim()
+        val args = stripLeadingNamedArguments(command.args)
+            .replacePipeMacro(pipe)
+            .trim()
         when (command.name.lowercase()) {
+            "pass" -> {
+                hasCompatibleCommand = true
+                pipe = resolveSlashArgument(args, pipe)
+            }
+
             "setinput", "input" -> {
+                hasCompatibleCommand = true
+                hasInputUpdate = true
                 inputText = resolveSlashArgument(args, pipe)
                 pipe = inputText
                 sendMode = QuickMessageSendMode.NONE
             }
 
             "send" -> {
+                hasCompatibleCommand = true
+                hasInputUpdate = true
                 inputText = resolveSlashArgument(args, pipe)
                 pipe = inputText
                 sendMode = QuickMessageSendMode.WITHOUT_RESPONSE
             }
 
             "trigger", "gen", "generate" -> {
+                hasCompatibleCommand = true
                 if (inputText.isBlank() && pipe.isNotBlank()) {
                     inputText = pipe
+                    hasInputUpdate = true
                 }
                 sendMode = QuickMessageSendMode.NORMAL
             }
 
-            "echo", "return" -> {
-                pipe = unquoteSlashArgument(args)
+            "echo" -> {
+                hasCompatibleCommand = true
+                pipe = resolveSlashArgument(args, pipe)
+                if (pipe.isNotBlank()) {
+                    toastMessages += pipe
+                }
             }
 
-            "/", "#", "breakpoint", "parser-flag" -> Unit
+            "return" -> {
+                hasCompatibleCommand = true
+                pipe = resolveSlashArgument(args, pipe)
+            }
+
+            "/", "#", "breakpoint", "parser-flag" -> {
+                hasCompatibleCommand = true
+            }
 
             else -> unsupported += "/${command.name}"
         }
     }
 
-    if (inputText.isBlank() && unsupported.isNotEmpty()) {
+    if (!hasCompatibleCommand && unsupported.isNotEmpty()) {
         return null
     }
 
     return QuickMessageExecutionPlan(
-        inputText = inputText,
+        inputText = if (hasInputUpdate) inputText else currentInput,
         sendMode = sendMode,
         unsupportedCommands = unsupported,
+        toastMessages = toastMessages,
     )
 }
 
@@ -198,13 +227,17 @@ private fun splitSlashPipeline(input: String): List<String> {
 
 private fun stripLeadingNamedArguments(args: String): String {
     var remaining = args.trimStart()
-    val namedArg = Regex("""^[A-Za-z_][A-Za-z0-9_-]*=(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\S+)\s*""")
 
     while (true) {
-        val match = namedArg.find(remaining) ?: return remaining
+        val match = leadingNamedArgumentRegex.find(remaining) ?: return remaining
         remaining = remaining.substring(match.range.last + 1).trimStart()
     }
 }
+
+private val leadingNamedArgumentRegex = Regex("""^[A-Za-z_][A-Za-z0-9_-]*=(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\S+)\s*""")
+
+private fun String.replacePipeMacro(pipe: String): String =
+    replace("{{pipe}}", pipe)
 
 private fun unquoteSlashArgument(value: String): String {
     val trimmed = value.trim()

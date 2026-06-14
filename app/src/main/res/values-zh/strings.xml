@@ -533,6 +533,7 @@
   <string name="quick_messages_page_empty_hint">点击右下角的 + 按钮添加快捷消息</string>
   <string name="quick_messages_page_empty_title">无快速消息</string>
   <string name="quick_messages_page_untitled">无标题</string>
+  <string name="quick_messages_unsupported_command">暂不支持的快捷命令：%s</string>
   <string name="reasoning_auto">自动</string>
   <string name="reasoning_auto_desc">让模型自动决定推理级别。</string>
   <string name="reasoning_custom">自定义推理预算</string>
