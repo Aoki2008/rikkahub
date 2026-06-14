@@ -490,12 +490,14 @@ class RouteActivity : ComponentActivity() {
                                 SillyTavernResourcesPage()
                             }
 
-                            entry<Screen.Skills> {
-                                SkillsPage()
-                            }
+                            if (AppFeatures.AGENT_SKILLS) {
+                                entry<Screen.Skills> {
+                                    SkillsPage()
+                                }
 
-                            entry<Screen.SkillDetail> { key ->
-                                SkillDetailPage(skillName = key.skillName)
+                                entry<Screen.SkillDetail> { key ->
+                                    SkillDetailPage(skillName = key.skillName)
+                                }
                             }
 
                             entry<Screen.MessageSearch> {

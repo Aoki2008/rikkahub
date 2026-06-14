@@ -774,7 +774,7 @@ class ChatService(
                         addAll(createSearchTools(settings))
                     }
                     addAll(localTools.getTools(assistant.localTools))
-                    if (assistant.enabledSkills.isNotEmpty()) {
+                    if (AppFeatures.AGENT_SKILLS && assistant.enabledSkills.isNotEmpty()) {
                         addAll(
                             createSkillTools(
                                 enabledSkills = assistant.enabledSkills,

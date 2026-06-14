@@ -126,17 +126,18 @@ internal fun FilesPicker(
             )
         }
 
-        // Extensions (Quick Messages + Prompt Injections + Skills)
+        // Extensions (Quick Messages + Prompt Injections + optional Agent Skills)
         val modeAndLorebookCount =
             if (assistant.allowConversationPromptInjection) {
                 conversation.modeInjectionIds.size + conversation.lorebookIds.size
             } else {
                 assistant.modeInjectionIds.size + assistant.lorebookIds.size
             }
+        val skillCount = if (AppFeatures.AGENT_SKILLS) assistant.enabledSkills.size else 0
         val activeCount =
             assistant.quickMessageIds.size +
                 modeAndLorebookCount +
-                assistant.enabledSkills.size
+                skillCount
         ListItem(
             leadingContent = {
                 Icon(

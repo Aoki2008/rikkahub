@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FilesManager
@@ -40,8 +41,10 @@ class AssistantDetailVM(
     val skills = _skills.asStateFlow()
 
     init {
-        viewModelScope.launch(Dispatchers.IO) {
-            _skills.value = skillManager.listSkills()
+        if (AppFeatures.AGENT_SKILLS) {
+            viewModelScope.launch(Dispatchers.IO) {
+                _skills.value = skillManager.listSkills()
+            }
         }
     }
 

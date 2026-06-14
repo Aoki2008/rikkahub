@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.R
 import kotlinx.coroutines.launch
 import me.rerere.rikkahub.Screen
@@ -44,7 +45,8 @@ fun AssistantExtensionsPage(id: String) {
     val navController = LocalNavController.current
     val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     val scope = rememberCoroutineScope()
-    val pagerState = rememberPagerState { 4 }
+    val showAgentSkills = AppFeatures.AGENT_SKILLS
+    val pagerState = rememberPagerState { if (showAgentSkills) 4 else 3 }
 
     Scaffold(
         topBar = {
@@ -82,11 +84,13 @@ fun AssistantExtensionsPage(id: String) {
                     onClick = { scope.launch { pagerState.animateScrollToPage(2) } },
                     text = { Text(stringResource(R.string.assistant_extensions_page_tab_lorebooks)) }
                 )
-                Tab(
-                    selected = pagerState.currentPage == 3,
-                    onClick = { scope.launch { pagerState.animateScrollToPage(3) } },
-                    text = { Text(stringResource(R.string.assistant_extensions_page_tab_skills)) }
-                )
+                if (showAgentSkills) {
+                    Tab(
+                        selected = pagerState.currentPage == 3,
+                        onClick = { scope.launch { pagerState.animateScrollToPage(3) } },
+                        text = { Text(stringResource(R.string.assistant_extensions_page_tab_skills)) }
+                    )
+                }
             }
 
             HorizontalPager(
@@ -183,7 +187,7 @@ fun AssistantExtensionsPage(id: String) {
                         }
                     }
 
-                    3 -> {
+                    3 -> if (showAgentSkills) {
                         if (skills.isEmpty()) {
                             ExtensionEmptyState(
                                 message = stringResource(R.string.assistant_extensions_page_empty_skills),

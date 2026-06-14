@@ -129,6 +129,7 @@ jobs:
             --tests "me.rerere.rikkahub.data.ai.TextCompletionPromptAssemblerTest" \
             --tests "me.rerere.rikkahub.data.ai.transformers.TextCompletionPresetIntegrationTest" \
             --tests "me.rerere.rikkahub.ui.pages.assistant.detail.AssistantImporterTest" \
+            --tests "me.rerere.rikkahub.AppFeaturesTest" \
             --tests "me.rerere.rikkahub.utils.UpdateCheckerTest"
 
       - name: Build debug APK

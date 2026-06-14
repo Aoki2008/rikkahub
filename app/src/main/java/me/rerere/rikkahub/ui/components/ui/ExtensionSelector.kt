@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.files.SkillManager
@@ -49,12 +50,17 @@ fun ExtensionSelector(
     onNavigateToPrompts: () -> Unit = {},
     onNavigateToSkills: () -> Unit = {},
 ) {
-    val skillManager: SkillManager = koinInject()
+    val showAgentSkills = AppFeatures.AGENT_SKILLS
+    val skillManager: SkillManager? = if (showAgentSkills) koinInject() else null
     var skills by remember { mutableStateOf<List<SkillMetadata>>(emptyList()) }
 
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            skills = skillManager.listSkills()
+    LaunchedEffect(showAgentSkills) {
+        if (showAgentSkills && skillManager != null) {
+            withContext(Dispatchers.IO) {
+                skills = skillManager.listSkills()
+            }
+        } else {
+            skills = emptyList()
         }
     }
 
@@ -71,7 +77,7 @@ fun ExtensionSelector(
         assistant.lorebookIds
     }
 
-    val pagerState = rememberPagerState { 4 }
+    val pagerState = rememberPagerState { if (showAgentSkills) 4 else 3 }
     val scope = rememberCoroutineScope()
 
     Column(
@@ -104,13 +110,15 @@ fun ExtensionSelector(
                 },
                 text = { Text(stringResource(R.string.extension_selector_tab_lorebooks)) }
             )
-            Tab(
-                selected = pagerState.currentPage == 3,
-                onClick = {
-                    scope.launch { pagerState.animateScrollToPage(3) }
-                },
-                text = { Text(stringResource(R.string.extension_selector_tab_skills)) }
-            )
+            if (showAgentSkills) {
+                Tab(
+                    selected = pagerState.currentPage == 3,
+                    onClick = {
+                        scope.launch { pagerState.animateScrollToPage(3) }
+                    },
+                    text = { Text(stringResource(R.string.extension_selector_tab_skills)) }
+                )
+            }
         }
 
         HorizontalPager(
@@ -200,7 +208,7 @@ fun ExtensionSelector(
                     }
                 }
 
-                3 -> {
+                3 -> if (showAgentSkills) {
                     if (skills.isNotEmpty()) {
                         SkillsContent(
                             skills = skills,

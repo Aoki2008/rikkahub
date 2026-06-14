@@ -21,6 +21,7 @@ import me.rerere.hugeicons.stroke.Book03
 import me.rerere.hugeicons.stroke.FileImport
 import me.rerere.hugeicons.stroke.Puzzle
 import me.rerere.hugeicons.stroke.Zap
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.ui.components.nav.BackButton
 import me.rerere.rikkahub.ui.components.ui.CardGroup
@@ -73,12 +74,14 @@ fun ExtensionsPage() {
                         headlineContent = { Text(stringResource(R.string.extensions_page_st_resources)) },
                         supportingContent = { Text(stringResource(R.string.extensions_page_st_resources_desc)) },
                     )
-                    item(
-                        onClick = { navController.navigate(Screen.Skills) },
-                        leadingContent = { Icon(HugeIcons.Puzzle, null) },
-                        headlineContent = { Text(stringResource(R.string.extensions_page_agent_skills)) },
-                        supportingContent = { Text(stringResource(R.string.extensions_page_agent_skills_desc)) },
-                    )
+                    if (AppFeatures.AGENT_SKILLS) {
+                        item(
+                            onClick = { navController.navigate(Screen.Skills) },
+                            leadingContent = { Icon(HugeIcons.Puzzle, null) },
+                            headlineContent = { Text(stringResource(R.string.extensions_page_agent_skills)) },
+                            supportingContent = { Text(stringResource(R.string.extensions_page_agent_skills_desc)) },
+                        )
+                    }
                 }
             }
         }
