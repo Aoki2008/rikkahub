@@ -2,6 +2,7 @@ package me.rerere.rikkahub.utils
 
 import android.app.DownloadManager
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.widget.Toast
 import androidx.core.net.toUri
@@ -10,14 +11,16 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import me.rerere.common.http.await
 import me.rerere.rikkahub.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.util.Locale
 
-private const val API_URL = "https://updates.rikka-ai.com/"
+private const val RELEASE_API_URL = "https://api.github.com/repos/Aoki2008/rikkahub/releases/latest"
 
 class UpdateChecker(private val client: OkHttpClient) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -29,16 +32,20 @@ class UpdateChecker(private val client: OkHttpClient) {
                 data = try {
                     val response = client.newCall(
                         Request.Builder()
-                            .url(API_URL)
+                            .url(RELEASE_API_URL)
                             .get()
                             .addHeader(
                                 "User-Agent",
-                                "RikkaHub ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
+                                "RikkaHub-ST ${BuildConfig.VERSION_NAME} #${BuildConfig.VERSION_CODE}"
                             )
                             .build()
                     ).await()
                     if (response.isSuccessful) {
-                        json.decodeFromString<UpdateInfo>(response.body.string())
+                        parseGitHubReleaseUpdateInfo(
+                            raw = response.body.string(),
+                            json = json,
+                            supportedAbis = Build.SUPPORTED_ABIS.toList(),
+                        )
                     } else {
                         throw Exception("Failed to fetch update info")
                     }
@@ -76,6 +83,82 @@ class UpdateChecker(private val client: OkHttpClient) {
         }
     }
 }
+
+internal fun parseGitHubReleaseUpdateInfo(
+    raw: String,
+    json: Json = Json { ignoreUnknownKeys = true },
+    supportedAbis: List<String>,
+): UpdateInfo {
+    val release = json.decodeFromString<GitHubRelease>(raw)
+    val downloads = release.assets
+        .filter { it.name.endsWith(".apk", ignoreCase = true) }
+        .sortedWith(
+            compareBy<GitHubAsset> { it.assetPriority(supportedAbis) }
+                .thenBy { it.name.lowercase(Locale.US) }
+        )
+        .map {
+            UpdateDownload(
+                name = it.name,
+                url = it.browserDownloadUrl,
+                size = it.size.toDisplaySize(),
+            )
+        }
+
+    return UpdateInfo(
+        version = normalizeReleaseVersion(release.tagName.ifBlank { release.name }),
+        publishedAt = release.publishedAt.ifBlank { "1970-01-01T00:00:00Z" },
+        changelog = release.body.orEmpty().ifBlank { release.htmlUrl },
+        downloads = downloads,
+    )
+}
+
+private fun GitHubAsset.assetPriority(supportedAbis: List<String>): Int {
+    val lowerName = name.lowercase(Locale.US)
+    val supported = supportedAbis.map { it.lowercase(Locale.US) }
+    val abiIndex = supported.indexOfFirst { lowerName.contains(it) }
+    return when {
+        abiIndex >= 0 -> abiIndex
+        "universal" in lowerName -> supported.size
+        else -> supported.size + 1
+    }
+}
+
+private fun normalizeReleaseVersion(value: String): String =
+    value.trim()
+        .removePrefix("v")
+        .removePrefix("V")
+
+private fun Long.toDisplaySize(): String {
+    val bytes = this.coerceAtLeast(0)
+    val kib = 1024.0
+    val mib = kib * 1024.0
+    return when {
+        bytes >= mib -> String.format(Locale.US, "%.1f MB", bytes / mib)
+        bytes >= kib -> String.format(Locale.US, "%.1f KB", bytes / kib)
+        else -> "$bytes B"
+    }
+}
+
+@Serializable
+internal data class GitHubRelease(
+    @SerialName("tag_name")
+    val tagName: String = "",
+    val name: String = "",
+    val body: String? = null,
+    @SerialName("published_at")
+    val publishedAt: String = "",
+    @SerialName("html_url")
+    val htmlUrl: String = "",
+    val assets: List<GitHubAsset> = emptyList(),
+)
+
+@Serializable
+internal data class GitHubAsset(
+    val name: String = "",
+    @SerialName("browser_download_url")
+    val browserDownloadUrl: String = "",
+    val size: Long = 0,
+)
 
 @Serializable
 data class UpdateDownload(

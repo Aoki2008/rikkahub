@@ -49,6 +49,7 @@ import me.rerere.hugeicons.stroke.MusicNote03
 import me.rerere.hugeicons.stroke.Package
 import me.rerere.hugeicons.stroke.Package01
 import me.rerere.hugeicons.stroke.Video01
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.data.ai.mcp.McpManager
@@ -115,7 +116,7 @@ internal fun FilesPicker(
             modifier = Modifier.fillMaxWidth()
         )
 
-        if (settings.mcpServers.isNotEmpty()) {
+        if (AppFeatures.MCP && settings.mcpServers.isNotEmpty()) {
             McpPickerListItem(
                 assistant = assistant,
                 servers = settings.mcpServers,

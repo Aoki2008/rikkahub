@@ -815,7 +815,7 @@
   <string name="setting_page_search_title">検索サービス</string>
   <string name="setting_page_share">共有</string>
   <string name="setting_page_share_desc">このアプリを友達と共有</string>
-  <string name="setting_page_share_text">RikkaHub - オープンソースAndroid AIアシスタント\n\nウェブサイト: https://rikka-ai.com/</string>
+  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nGitHub: https://github.com/Aoki2008/rikkahub</string>
   <string name="setting_page_sponsor_alert_confirm">寄付</string>
   <string name="setting_page_sponsor_alert_desc">アプリを100回以上起動しました！気に入っていただけたら、開発者をサポートしていただけると嬉しいです。</string>
   <string name="setting_page_sponsor_alert_dismiss">今はしない</string>
@@ -1050,7 +1050,7 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="theme_name_sakura">サクラピンク</string>
   <string name="theme_name_spring">メドウグリーン</string>
   <string name="title_activity_safe_mode">セーフモード</string>
-  <string name="tools_warning">現在のモデルではツール呼び出しが有効になっていません。設定でモデルのツール機能を有効にしてから、検索/MCPなどの機能を使用してください。</string>
+  <string name="tools_warning">現在のモデルではツール呼び出しが有効になっていません。検索とツール機能を使用するには、設定でモデルのツール機能を有効にしてください。</string>
   <string name="translate">翻訳</string>
   <string name="translating">翻訳中...</string>
   <string name="translation_clear">翻訳をクリア</string>
@@ -1113,4 +1113,3 @@ mDNSアドレス: .localホスト名を使用し、IPを知らなくても同じ
   <string name="assistant_page_gradient_background">グラデーション背景</string>
   <string name="assistant_page_gradient_background_desc">チャットページで動的なグラデーション背景を使用します</string>
 </resources>
-

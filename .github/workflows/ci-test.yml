@@ -6,7 +6,31 @@ name: CI - Unit Tests
 
 on:
   push:
+    branches:
+      - main
+      - feat/sillytavern-parity
+    paths:
+      - '.github/smoke.sh'
+      - '.github/workflows/ci-test.yml'
+      - 'ai/**'
+      - 'app/**'
+      - 'common/**'
+      - 'document/**'
+      - 'gradle/**'
+      - 'gradle.properties'
+      - 'highlight/**'
+      - 'material3/**'
+      - 'search/**'
+      - 'settings.gradle.kts'
+      - 'speech/**'
+      - 'web/**'
+      - 'web-ui/**'
+      - 'build.gradle.kts'
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   unit-tests:
@@ -96,7 +120,9 @@ jobs:
             --tests "me.rerere.rikkahub.data.model.SillyTavernQuickReplyParserTest" \
             --tests "me.rerere.rikkahub.data.model.QuickMessageExecutionTest" \
             --tests "me.rerere.rikkahub.data.ai.TextCompletionPromptAssemblerTest" \
-            --tests "me.rerere.rikkahub.data.ai.transformers.TextCompletionPresetIntegrationTest"
+            --tests "me.rerere.rikkahub.data.ai.transformers.TextCompletionPresetIntegrationTest" \
+            --tests "me.rerere.rikkahub.ui.pages.assistant.detail.AssistantImporterTest" \
+            --tests "me.rerere.rikkahub.utils.UpdateCheckerTest"
 
       - name: Build debug APK
         run: ./gradlew :app:assembleDebug --stacktrace

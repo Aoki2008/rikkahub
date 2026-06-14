@@ -48,6 +48,7 @@ import me.rerere.ai.ui.finishReasoning
 import me.rerere.ai.ui.isEmptyInputMessage
 import me.rerere.common.android.Logging
 import me.rerere.rikkahub.AppScope
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.CHAT_COMPLETED_NOTIFICATION_CHANNEL_ID
 import me.rerere.rikkahub.CHAT_LIVE_UPDATE_NOTIFICATION_CHANNEL_ID
 import me.rerere.rikkahub.R
@@ -633,7 +634,7 @@ class ChatService(
 
             // memory tool
             if (!model.abilities.contains(ModelAbility.TOOL)) {
-                if (settings.enableWebSearch || mcpManager.getAllAvailableTools().isNotEmpty()) {
+                if (settings.enableWebSearch || (AppFeatures.MCP && mcpManager.getAllAvailableTools().isNotEmpty())) {
                     addError(
                         IllegalStateException(context.getString(R.string.tools_warning)),
                         conversationId,
@@ -688,18 +689,20 @@ class ChatService(
                             )
                         )
                     }
-                    mcpManager.getAllAvailableTools().forEach { (serverId, tool) ->
-                        add(
-                            Tool(
-                                name = "mcp__" + tool.name,
-                                description = tool.description ?: "",
-                                parameters = { tool.inputSchema },
-                                needsApproval = tool.needsApproval,
-                                execute = {
-                                    mcpManager.callTool(serverId, tool.name, it.jsonObject)
-                                },
+                    if (AppFeatures.MCP) {
+                        mcpManager.getAllAvailableTools().forEach { (serverId, tool) ->
+                            add(
+                                Tool(
+                                    name = "mcp__" + tool.name,
+                                    description = tool.description ?: "",
+                                    parameters = { tool.inputSchema },
+                                    needsApproval = tool.needsApproval,
+                                    execute = {
+                                        mcpManager.callTool(serverId, tool.name, it.jsonObject)
+                                    },
+                                )
                             )
-                        )
+                        }
                     }
                 },
             ).onCompletion {
@@ -722,9 +725,11 @@ class ChatService(
             }.collect { chunk ->
                 when (chunk) {
                     is GenerationChunk.Messages -> {
-                        val updatedConversation = getConversationFlow(conversationId).value
-                            .updateCurrentMessages(chunk.messages)
-                        updateConversation(conversationId, updatedConversation)
+                        val currentConversation = getConversationFlow(conversationId).value
+                        if (currentConversation.currentMessages != chunk.messages) {
+                            val updatedConversation = currentConversation.updateCurrentMessages(chunk.messages)
+                            updateConversation(conversationId, updatedConversation)
+                        }
 
                         // 如果应用不在前台，发送 Live Update 通知
                         if (!isForeground.value && settings.displaySetting.enableNotificationOnMessageGeneration && settings.displaySetting.enableLiveUpdateNotification) {

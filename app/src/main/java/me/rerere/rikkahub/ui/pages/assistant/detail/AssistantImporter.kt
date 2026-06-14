@@ -41,6 +41,7 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.CharacterCard
 import me.rerere.rikkahub.data.model.DEFAULT_PROMPT_PRESET_ID
 import me.rerere.rikkahub.data.model.InjectionPosition
@@ -165,7 +166,7 @@ private fun SillyTavernImporter(
 /**
  * 解析结果：助手 + 可选的随角色卡导入的世界书(character_book)
  */
-private data class ParsedCard(
+internal data class ParsedCard(
     val assistant: Assistant,
     val lorebook: Lorebook?,
 )
@@ -177,10 +178,10 @@ private data class ParsedCard(
  * 使用同一套解析逻辑，并完整提取嵌入的 character_book、depth_prompt、
  * post_history_instructions、mes_example、alternate_greetings 等字段。
  */
-private fun parseTavernCard(
-    context: Context,
+internal fun parseTavernCard(
     json: JsonObject,
-    background: String?,
+    avatarImage: String?,
+    missingNameMessage: String,
 ): ParsedCard {
     // V2/V3 将字段包在 data 下；V1 角色卡字段位于根对象。
     val data = json["data"]?.let { runCatching { it.jsonObject }.getOrNull() } ?: json
@@ -188,7 +189,7 @@ private fun parseTavernCard(
     fun field(key: String): String? = data[key]?.jsonPrimitiveOrNull?.contentOrNull
 
     val name = field("name")
-        ?: error(context.getString(R.string.assistant_importer_missing_name_field))
+        ?: error(missingNameMessage)
     val description = field("description")
     val personality = field("personality")
     val scenario = field("scenario")
@@ -257,11 +258,13 @@ private fun parseTavernCard(
 
     val assistant = Assistant(
         name = name,
+        avatar = avatarImage?.let(Avatar::Image) ?: Avatar.Dummy,
+        useAssistantAvatar = avatarImage != null,
         presetMessages = if (!firstMessage.isNullOrBlank()) {
             listOf(UIMessage.assistant(firstMessage))
         } else emptyList(),
         systemPrompt = systemPrompt,
-        background = background,
+        background = null,
         regexes = regexScripts,
         lorebookIds = lorebook?.let { setOf(it.id) } ?: emptySet(),
         // 绑定内置默认预设，使角色卡字段经 Prompt Manager 的 marker 正确组装，
@@ -431,14 +434,14 @@ private suspend fun importAssistantFromUri(
 ) {
     try {
         val mime = withContext(Dispatchers.IO) { filesManager.getFileMimeType(uri) }
-        val (jsonString, backgroundStr) = withContext(Dispatchers.IO) {
+        val (jsonString, avatarImage) = withContext(Dispatchers.IO) {
             when (mime) {
                 "image/png" -> {
                     val result = ImageUtils.getTavernCharacterMeta(context, uri)
                     result.map { base64Data ->
                         val json = String(Base64.decode(base64Data, Base64.DEFAULT))
-                        val bg = filesManager.createChatFilesByContents(listOf(uri)).first().toString()
-                        json to bg
+                        val image = filesManager.createChatFilesByContents(listOf(uri)).first().toString()
+                        json to image
                     }.getOrElse { throw it }
                 }
 
@@ -453,7 +456,11 @@ private suspend fun importAssistantFromUri(
             }
         }
         val json = Json.parseToJsonElement(jsonString).jsonObject
-        val parsed = parseTavernCard(context = context, json = json, background = backgroundStr)
+        val parsed = parseTavernCard(
+            json = json,
+            avatarImage = avatarImage,
+            missingNameMessage = context.getString(R.string.assistant_importer_missing_name_field),
+        )
         // 将随角色卡导入的世界书写入全局设置，助手通过 lorebookIds 关联
         parsed.lorebook?.let { lorebook ->
             settingsStore.update { settings ->

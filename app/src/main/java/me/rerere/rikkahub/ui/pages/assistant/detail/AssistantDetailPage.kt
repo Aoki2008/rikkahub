@@ -44,6 +44,7 @@ import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.plus
 import org.koin.androidx.compose.koinViewModel
 import org.koin.core.parameter.parametersOf
+import me.rerere.rikkahub.AppFeatures
 
 @Composable
 fun AssistantDetailPage(id: String) {
@@ -128,13 +129,15 @@ fun AssistantDetailPage(id: String) {
                         headlineContent = { Text(stringResource(R.string.assistant_page_tab_request)) },
                         trailingContent = { Icon(HugeIcons.ArrowRight01, null) },
                     )
-                    item(
-                        onClick = { navController.navigate(Screen.AssistantMcp(id)) },
-                        leadingContent = { Icon(HugeIcons.Wrench01, null) },
-                        supportingContent = { Text(stringResource(R.string.assistant_detail_mcp_desc)) },
-                        headlineContent = { Text(stringResource(R.string.assistant_page_tab_mcp)) },
-                        trailingContent = { Icon(HugeIcons.ArrowRight01, null) },
-                    )
+                    if (AppFeatures.MCP) {
+                        item(
+                            onClick = { navController.navigate(Screen.AssistantMcp(id)) },
+                            leadingContent = { Icon(HugeIcons.Wrench01, null) },
+                            supportingContent = { Text(stringResource(R.string.assistant_detail_mcp_desc)) },
+                            headlineContent = { Text(stringResource(R.string.assistant_page_tab_mcp)) },
+                            trailingContent = { Icon(HugeIcons.ArrowRight01, null) },
+                        )
+                    }
                     item(
                         onClick = { navController.navigate(Screen.AssistantLocalTool(id)) },
                         leadingContent = { Icon(HugeIcons.BookOpen01, null) },
