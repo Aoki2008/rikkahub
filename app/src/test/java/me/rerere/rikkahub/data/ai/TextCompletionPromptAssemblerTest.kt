@@ -107,4 +107,63 @@ class TextCompletionPromptAssemblerTest {
 
         assertTrue(prompt.indexOf("U:Hello") < prompt.indexOf("After history"))
     }
+
+    @Test
+    fun `story string replaces SillyTavern user and character macros`() {
+        val prompt = TextCompletionPromptAssembler.assemble(
+            TextCompletionAssemblyInput(
+                contextPreset = ContextPreset(storyString = "{{char}} greets {{user}}{{trim}}"),
+                instructPreset = InstructPreset(),
+                userName = "Hero",
+                characterName = "Mira",
+            )
+        )
+
+        assertEquals("Mira greets Hero", prompt)
+    }
+
+    @Test
+    fun `in chat story string is injected by depth and role instead of prepended`() {
+        val prompt = TextCompletionPromptAssembler.assemble(
+            TextCompletionAssemblyInput(
+                contextPreset = ContextPreset(
+                    storyString = "{{#if system}}{{system}}{{/if}}{{trim}}",
+                    chatStart = "[Start]",
+                    storyStringPosition = 1,
+                    storyStringDepth = 1,
+                    storyStringRole = 0,
+                ),
+                instructPreset = InstructPreset(
+                    inputSequence = "U:",
+                    outputSequence = "A:",
+                    systemSequence = "S:",
+                ),
+                systemPromptPreset = SystemPromptPreset(content = "Pinned story"),
+                chatHistory = listOf(
+                    UIMessage.user("Older"),
+                    UIMessage.assistant("Recent"),
+                    UIMessage.user("Latest"),
+                ),
+            )
+        )
+
+        assertInOrder(
+            prompt,
+            "[Start]",
+            "U:Older",
+            "A:Recent",
+            "S:Pinned story",
+            "U:Latest",
+        )
+    }
+
+    private fun assertInOrder(text: String, vararg fragments: String) {
+        var cursor = -1
+        fragments.forEach { fragment ->
+            val index = text.indexOf(fragment)
+            assertTrue("Missing fragment: $fragment\n$text", index >= 0)
+            assertTrue("Out of order fragment: $fragment\n$text", index > cursor)
+            cursor = index
+        }
+    }
 }
