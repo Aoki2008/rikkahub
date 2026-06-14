@@ -14,7 +14,6 @@ import kotlinx.serialization.json.encodeToJsonElement
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
-import kotlinx.serialization.json.parseToJsonElement
 import me.rerere.ai.core.MessageRole
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.Lorebook
