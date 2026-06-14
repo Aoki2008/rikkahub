@@ -95,6 +95,96 @@ class TextCompletionPromptAssemblerTest {
     }
 
     @Test
+    fun `instruct chat turns follow SillyTavern wrap and macro formatting`() {
+        val history = TextCompletionPromptAssembler.renderHistory(
+            messages = listOf(
+                UIMessage.user("Hello"),
+                UIMessage.assistant("Hi"),
+            ),
+            instruct = InstructPreset(
+                inputSequence = "<|user {{name}} {{char}}|>",
+                inputSuffix = "<END {{name}}>",
+                outputSequence = "<|assistant {{name}} {{user}}|>",
+                namesBehavior = "always",
+                wrap = true,
+                macro = true,
+            ),
+            input = TextCompletionAssemblyInput(
+                contextPreset = ContextPreset(),
+                instructPreset = InstructPreset(),
+                userName = "Alice",
+                characterName = "Mira",
+            ),
+        )
+
+        assertEquals(
+            """
+                <|user Alice Mira|>
+                Alice: Hello<END Alice>
+                <|assistant Mira Alice|>
+                Mira: Hi
+            """.trimIndent(),
+            history,
+        )
+    }
+
+    @Test
+    fun `story string prefix and suffix follow SillyTavern wrap and macro formatting`() {
+        val prompt = TextCompletionPromptAssembler.assemble(
+            TextCompletionAssemblyInput(
+                contextPreset = ContextPreset(storyString = "{{#if system}}{{system}}{{/if}}{{trim}}"),
+                instructPreset = InstructPreset(
+                    storyStringPrefix = "<SYSTEM {{name}} for {{char}}>",
+                    storyStringSuffix = "</SYSTEM {{user}}>",
+                    wrap = true,
+                    macro = true,
+                ),
+                systemPromptPreset = SystemPromptPreset(content = "Act as Mira."),
+                userName = "Hero",
+                characterName = "Mira",
+            )
+        )
+
+        assertEquals(
+            """
+                <SYSTEM System for Mira>
+                Act as Mira.</SYSTEM Hero>
+            """.trimIndent(),
+            prompt,
+        )
+    }
+
+    @Test
+    fun `assemble appends SillyTavern assistant reply cue after user turn`() {
+        val prompt = TextCompletionPromptAssembler.assemble(
+            TextCompletionAssemblyInput(
+                contextPreset = ContextPreset(storyString = ""),
+                instructPreset = InstructPreset(
+                    inputSequence = "USER",
+                    outputSequence = "ASSISTANT",
+                    lastOutputSequence = "FINAL ASSISTANT",
+                    namesBehavior = "always",
+                    wrap = true,
+                    macro = true,
+                ),
+                chatHistory = listOf(UIMessage.user("Hello")),
+                userName = "Hero",
+                characterName = "Mira",
+            )
+        )
+
+        assertEquals(
+            """
+                USER
+                Hero: Hello
+                FINAL ASSISTANT
+                Mira:
+            """.trimIndent(),
+            prompt,
+        )
+    }
+
+    @Test
     fun `post history is appended after turns`() {
         val prompt = TextCompletionPromptAssembler.assemble(
             TextCompletionAssemblyInput(
