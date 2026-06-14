@@ -48,6 +48,9 @@ data class Assistant(
     val characterCard: CharacterCard? = null, // 导入的 SillyTavern 角色卡原始字段(用于宏与重建提示词)
     val authorsNote: AuthorsNote = AuthorsNote(), // 作者注释(深度注入)
     val promptPresetId: Uuid? = null, // 绑定的 Chat Completion 预设(酒馆预设); 非空时用 Prompt Manager 组装
+    val contextPresetId: Uuid? = null, // 绑定的 Text Completion context 预设
+    val instructPresetId: Uuid? = null, // 绑定的 Text Completion instruct 预设
+    val systemPromptPresetId: Uuid? = null, // 绑定的 Text Completion system prompt 预设(可选)
 )
 
 /**

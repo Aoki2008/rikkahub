@@ -35,7 +35,9 @@ import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV2Migration
 import me.rerere.rikkahub.data.datastore.migration.PreferenceStoreV3Migration
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
+import me.rerere.rikkahub.data.model.ContextPreset
 import me.rerere.rikkahub.data.model.InjectionPosition
+import me.rerere.rikkahub.data.model.InstructPreset
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.ChatGroup
 import me.rerere.rikkahub.data.model.DEFAULT_CHAT_COMPLETION_PRESET
@@ -44,6 +46,7 @@ import me.rerere.rikkahub.data.model.PromptPreset
 import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.SystemPromptPreset
 import me.rerere.rikkahub.data.model.Tag
 import me.rerere.rikkahub.data.sync.s3.S3Config
 import me.rerere.rikkahub.ui.theme.CustomTheme
@@ -152,6 +155,9 @@ class SettingsStore(
         val CHAT_GROUPS = stringPreferencesKey("chat_groups")
         val SELECTED_GROUP = stringPreferencesKey("selected_group")
         val PROMPT_PRESETS = stringPreferencesKey("prompt_presets")
+        val CONTEXT_PRESETS = stringPreferencesKey("context_presets")
+        val INSTRUCT_PRESETS = stringPreferencesKey("instruct_presets")
+        val SYSTEM_PROMPT_PRESETS = stringPreferencesKey("system_prompt_presets")
 
         // 备份提醒
         val BACKUP_REMINDER_CONFIG = stringPreferencesKey("backup_reminder_config")
@@ -255,6 +261,15 @@ class SettingsStore(
                 promptPresets = preferences[PROMPT_PRESETS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
+                contextPresets = preferences[CONTEXT_PRESETS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
+                instructPresets = preferences[INSTRUCT_PRESETS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
+                systemPromptPresets = preferences[SYSTEM_PROMPT_PRESETS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
                 webServerEnabled = preferences[WEB_SERVER_ENABLED] == true,
                 webServerPort = preferences[WEB_SERVER_PORT] ?: 8080,
                 webServerJwtEnabled = preferences[WEB_SERVER_JWT_ENABLED] == true,
@@ -315,6 +330,9 @@ class SettingsStore(
             val validModeInjectionIds = settings.modeInjections.map { it.id }.toSet()
             val validLorebookIds = settings.lorebooks.map { it.id }.toSet()
             val validQuickMessageIds = settings.quickMessages.map { it.id }.toSet()
+            val validContextPresetIds = settings.contextPresets.map { it.id }.toSet()
+            val validInstructPresetIds = settings.instructPresets.map { it.id }.toSet()
+            val validSystemPromptPresetIds = settings.systemPromptPresets.map { it.id }.toSet()
             val asrProviders = settings.asrProviders.distinctBy { it.id }
             settings.copy(
                 providers = settings.providers.distinctBy { it.id }.map { provider ->
@@ -349,7 +367,16 @@ class SettingsStore(
                         // 过滤掉不存在的快捷消息 ID
                         quickMessageIds = assistant.quickMessageIds.filter { id ->
                             id in validQuickMessageIds
-                        }.toSet()
+                        }.toSet(),
+                        contextPresetId = assistant.contextPresetId?.takeIf { id ->
+                            id in validContextPresetIds
+                        },
+                        instructPresetId = assistant.instructPresetId?.takeIf { id ->
+                            id in validInstructPresetIds
+                        },
+                        systemPromptPresetId = assistant.systemPromptPresetId?.takeIf { id ->
+                            id in validSystemPromptPresetIds
+                        },
                     )
                 },
                 ttsProviders = settings.ttsProviders.distinctBy { it.id },
@@ -370,6 +397,9 @@ class SettingsStore(
                 selectedGroupId = settings.selectedGroupId
                     ?.takeIf { id -> settings.chatGroups.any { it.id == id } },
                 promptPresets = settings.promptPresets.distinctBy { it.id },
+                contextPresets = settings.contextPresets.distinctBy { it.id },
+                instructPresets = settings.instructPresets.distinctBy { it.id },
+                systemPromptPresets = settings.systemPromptPresets.distinctBy { it.id },
             )
         }
         .onEach {
@@ -442,6 +472,9 @@ class SettingsStore(
             preferences[PERSONAS] = JsonInstant.encodeToString(settings.personas)
             preferences[CHAT_GROUPS] = JsonInstant.encodeToString(settings.chatGroups)
             preferences[PROMPT_PRESETS] = JsonInstant.encodeToString(settings.promptPresets)
+            preferences[CONTEXT_PRESETS] = JsonInstant.encodeToString(settings.contextPresets)
+            preferences[INSTRUCT_PRESETS] = JsonInstant.encodeToString(settings.instructPresets)
+            preferences[SYSTEM_PROMPT_PRESETS] = JsonInstant.encodeToString(settings.systemPromptPresets)
             settings.selectedPersonaId?.let {
                 preferences[SELECTED_PERSONA] = it.toString()
             } ?: preferences.remove(SELECTED_PERSONA)
@@ -583,6 +616,9 @@ data class Settings(
     val chatGroups: List<ChatGroup> = emptyList(),
     val selectedGroupId: Uuid? = null,
     val promptPresets: List<PromptPreset> = emptyList(),
+    val contextPresets: List<ContextPreset> = emptyList(),
+    val instructPresets: List<InstructPreset> = emptyList(),
+    val systemPromptPresets: List<SystemPromptPreset> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
     val webServerJwtEnabled: Boolean = false,
