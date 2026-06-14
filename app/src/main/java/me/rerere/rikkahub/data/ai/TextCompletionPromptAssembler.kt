@@ -33,7 +33,7 @@ object TextCompletionPromptAssembler {
             insertInChatStoryString(input.chatHistory, story, input.contextPreset)
         } else {
             input.chatHistory
-        }
+        }.withUserAlignmentMessage(input)
         val history = renderHistory(chatHistory, input.instructPreset, input)
 
         return buildString {
@@ -162,6 +162,19 @@ object TextCompletionPromptAssembler {
         }
         return messages.take(insertIndex) + storyMessage + messages.drop(insertIndex)
     }
+
+    private fun List<UIMessage>.withUserAlignmentMessage(input: TextCompletionAssemblyInput): List<UIMessage> {
+        val alignment = input.instructPreset.userAlignmentMessage
+            .replaceSillyTavernNameMacros(input)
+            .trim()
+        if (alignment.isBlank()) return this
+        if (lastOrNull()?.role == MessageRole.USER) return this
+        return listOf(UIMessage.user(alignment)) + this
+    }
+
+    private fun String.replaceSillyTavernNameMacros(input: TextCompletionAssemblyInput): String =
+        replace("{{user}}", input.userName)
+            .replace("{{char}}", input.characterName)
 }
 
 private const val STORY_STRING_POSITION_IN_CHAT = 1
