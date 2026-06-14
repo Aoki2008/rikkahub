@@ -29,18 +29,18 @@ object TextCompletionPromptAssembler {
     fun assemble(input: TextCompletionAssemblyInput): String {
         val story = renderStoryString(input)
         val storyInChat = input.contextPreset.storyStringPosition == STORY_STRING_POSITION_IN_CHAT && story.isNotBlank()
+        val formattedStory = if (storyInChat) "" else formatStoryString(story, input)
         val chatHistory = if (storyInChat) {
             insertInChatStoryString(input.chatHistory, story, input.contextPreset)
         } else {
             input.chatHistory
         }.withUserAlignmentMessage(input)
         val history = renderHistory(chatHistory, input.instructPreset, input)
+        val replyCue = renderReplyCue(input.instructPreset, input)
 
         return buildString {
             if (!storyInChat) {
-                append(input.instructPreset.storyStringPrefix)
-                append(story)
-                append(input.instructPreset.storyStringSuffix)
+                append(formattedStory)
             }
             if (input.contextPreset.chatStart.isNotBlank()) {
                 appendSeparated(input.contextPreset.chatStart)
@@ -51,6 +51,9 @@ object TextCompletionPromptAssembler {
             input.systemPromptPreset?.postHistory
                 ?.takeIf { it.isNotBlank() }
                 ?.let { appendSeparated(it) }
+            if (replyCue.isNotBlank()) {
+                append(replyCue)
+            }
         }.trim()
     }
 
@@ -92,9 +95,13 @@ object TextCompletionPromptAssembler {
                     last && instruct.lastInputSequence.isNotBlank() -> instruct.lastInputSequence
                     else -> instruct.inputSequence
                 },
-                content = namePrefix(input.userName, instruct, text),
+                content = text,
                 suffix = instruct.inputSuffix,
+                name = input.userName,
                 wrap = instruct.wrap,
+                macro = instruct.macro,
+                input = input,
+                includeName = shouldIncludeName(instruct),
             )
 
             MessageRole.ASSISTANT -> renderTurn(
@@ -103,9 +110,13 @@ object TextCompletionPromptAssembler {
                     last && instruct.lastOutputSequence.isNotBlank() -> instruct.lastOutputSequence
                     else -> instruct.outputSequence
                 },
-                content = namePrefix(input.characterName, instruct, text),
+                content = text,
                 suffix = instruct.outputSuffix,
+                name = input.characterName,
                 wrap = instruct.wrap,
+                macro = instruct.macro,
+                input = input,
+                includeName = shouldIncludeName(instruct),
             )
 
             MessageRole.SYSTEM -> renderTurn(
@@ -116,28 +127,39 @@ object TextCompletionPromptAssembler {
                 },
                 content = text,
                 suffix = if (instruct.systemSameAsUser) instruct.inputSuffix else instruct.systemSuffix,
+                name = "System",
                 wrap = instruct.wrap,
+                macro = instruct.macro,
+                input = input,
+                includeName = false,
             )
 
             else -> text
         }
-    }.joinToString("\n").trim()
+    }.joinToString("")
 
     private fun renderTurn(
         sequence: String,
         content: String,
         suffix: String,
+        name: String,
         wrap: Boolean,
+        macro: Boolean,
+        input: TextCompletionAssemblyInput,
+        includeName: Boolean,
     ): String {
-        val body = if (wrap) content.trim() else content
-        return "$sequence$body$suffix".trimEnd()
-    }
-
-    private fun namePrefix(name: String, instruct: InstructPreset, text: String): String {
-        return when (instruct.namesBehavior.lowercase()) {
-            "always", "1", "2" -> "$name: $text"
-            else -> text
+        val prefix = sequence.renderInstructMacros(input, name, macro)
+        var renderedSuffix = suffix.renderInstructMacros(input, name, macro)
+        if (renderedSuffix.isEmpty() && wrap) {
+            renderedSuffix = "\n"
         }
+        val separator = if (wrap) "\n" else ""
+        val body = if (includeName && name.isNotBlank()) {
+            "$name: $content$renderedSuffix"
+        } else {
+            "$content$renderedSuffix"
+        }
+        return listOf(prefix, body).filter { it.isNotEmpty() }.joinToString(separator)
     }
 
     private fun StringBuilder.appendSeparated(text: String) {
@@ -165,16 +187,63 @@ object TextCompletionPromptAssembler {
 
     private fun List<UIMessage>.withUserAlignmentMessage(input: TextCompletionAssemblyInput): List<UIMessage> {
         val alignment = input.instructPreset.userAlignmentMessage
-            .replaceSillyTavernNameMacros(input)
+            .renderInstructMacros(input, input.userName, input.instructPreset.macro)
             .trim()
         if (alignment.isBlank()) return this
         if (lastOrNull()?.role == MessageRole.USER) return this
         return listOf(UIMessage.user(alignment)) + this
     }
 
-    private fun String.replaceSillyTavernNameMacros(input: TextCompletionAssemblyInput): String =
-        replace("{{user}}", input.userName)
-            .replace("{{char}}", input.characterName)
+    private fun formatStoryString(story: String, input: TextCompletionAssemblyInput): String {
+        if (story.isBlank()) return ""
+        val separator = if (input.instructPreset.wrap) "\n" else ""
+        var result = story
+        if (input.instructPreset.storyStringPrefix.isNotBlank()) {
+            val prefix = input.instructPreset.storyStringPrefix.renderInstructMacros(input, "System", macro = true)
+            result = prefix + separator + result
+        }
+        if (input.instructPreset.storyStringSuffix.isNotBlank()) {
+            val suffix = input.instructPreset.storyStringSuffix.renderInstructMacros(input, "System", macro = true)
+            result += suffix
+        }
+        return result
+    }
+
+    private fun renderReplyCue(instruct: InstructPreset, input: TextCompletionAssemblyInput): String {
+        val sequence = (instruct.lastOutputSequence.ifBlank { instruct.outputSequence })
+            .renderInstructMacros(input, input.characterName, instruct.macro)
+        val separator = if (instruct.wrap) "\n" else ""
+        val includeName = shouldIncludeName(instruct) && input.characterName.isNotBlank()
+        val text = if (includeName) {
+            separator + sequence + separator + "${input.characterName}:"
+        } else {
+            separator + sequence
+        }
+        val base = if (instruct.wrap) {
+            text.trimEnd()
+        } else {
+            text
+        }
+        return base + if (includeName) "" else separator
+    }
+
+    private fun shouldIncludeName(instruct: InstructPreset): Boolean = when (instruct.namesBehavior.lowercase()) {
+        "always", "1", "2" -> true
+        else -> false
+    }
+
+    private fun String.renderInstructMacros(
+        input: TextCompletionAssemblyInput,
+        name: String,
+        macro: Boolean,
+    ): String {
+        if (!macro) return this
+        return replace("{{user}}", input.userName, ignoreCase = true)
+            .replace("{{char}}", input.characterName, ignoreCase = true)
+            .replace("{{name1}}", input.userName, ignoreCase = true)
+            .replace("{{name2}}", input.characterName, ignoreCase = true)
+            .replace(Regex("""\{\{name\}\}""", RegexOption.IGNORE_CASE), name)
+    }
 }
 
 private const val STORY_STRING_POSITION_IN_CHAT = 1

@@ -31,6 +31,7 @@ class TextCompletionPromptAssemblerTest {
                 instructPreset = InstructPreset(
                     inputSequence = "User: ",
                     outputSequence = "Bot: ",
+                    wrap = false,
                 ),
                 systemPromptPreset = SystemPromptPreset(content = "Act well"),
                 description = "Character desc",
@@ -67,8 +68,8 @@ class TextCompletionPromptAssemblerTest {
             ),
         )
 
-        assertTrue(history.contains("<|user|>Alice: Hello"))
-        assertTrue(history.contains("<|assistant|>Bot: Hi"))
+        assertTrue(history.contains("<|user|>\nAlice: Hello"))
+        assertTrue(history.contains("<|assistant|>\nBot: Hi"))
     }
 
     @Test
@@ -82,6 +83,7 @@ class TextCompletionPromptAssemblerTest {
                 inputSequence = "I:",
                 firstInputSequence = "FIRST:",
                 lastInputSequence = "LAST:",
+                wrap = false,
             ),
             input = TextCompletionAssemblyInput(
                 contextPreset = ContextPreset(),
@@ -118,12 +120,12 @@ class TextCompletionPromptAssemblerTest {
         )
 
         assertEquals(
-            """
-                <|user Alice Mira|>
-                Alice: Hello<END Alice>
-                <|assistant Mira Alice|>
-                Mira: Hi
-            """.trimIndent(),
+            listOf(
+                "<|user Alice Mira|>",
+                "Alice: Hello<END Alice>",
+                "<|assistant Mira Alice|>",
+                "Mira: Hi",
+            ).joinToString("\n") + "\n",
             history,
         )
     }
@@ -174,12 +176,13 @@ class TextCompletionPromptAssemblerTest {
         )
 
         assertEquals(
-            """
-                USER
-                Hero: Hello
-                FINAL ASSISTANT
-                Mira:
-            """.trimIndent(),
+            listOf(
+                "USER",
+                "Hero: Hello",
+                "",
+                "FINAL ASSISTANT",
+                "Mira:",
+            ).joinToString("\n"),
             prompt,
         )
     }
@@ -195,7 +198,7 @@ class TextCompletionPromptAssemblerTest {
             )
         )
 
-        assertTrue(prompt.indexOf("U:Hello") < prompt.indexOf("After history"))
+        assertTrue(prompt.indexOf("U:\nHello") < prompt.indexOf("After history"))
     }
 
     @Test
@@ -227,6 +230,7 @@ class TextCompletionPromptAssemblerTest {
                     inputSequence = "U:",
                     outputSequence = "A:",
                     systemSequence = "S:",
+                    wrap = false,
                 ),
                 systemPromptPreset = SystemPromptPreset(content = "Pinned story"),
                 chatHistory = listOf(
@@ -270,6 +274,7 @@ class TextCompletionPromptAssemblerTest {
                     firstInputSequence = "FIRST_U:",
                     outputSequence = "A:",
                     userAlignmentMessage = "{{user}} should answer as {{char}}.",
+                    wrap = false,
                 ),
                 chatHistory = listOf(UIMessage.assistant("Greeting.")),
                 userName = "Hero",

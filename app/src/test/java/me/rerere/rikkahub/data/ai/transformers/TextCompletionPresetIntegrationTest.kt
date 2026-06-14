@@ -52,8 +52,8 @@ class TextCompletionPresetIntegrationTest {
 
     private val instructPreset = InstructPreset(
         name = "Alpaca",
-        inputSequence = "### Instruction:\n",
-        outputSequence = "### Response:\n",
+        inputSequence = "### Instruction:",
+        outputSequence = "### Response:",
         namesBehavior = "always",
     )
 
