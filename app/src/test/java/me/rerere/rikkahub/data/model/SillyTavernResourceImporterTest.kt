@@ -116,9 +116,10 @@ class SillyTavernResourceImporterTest {
             """.trimIndent()
         )
 
-        assertEquals(10, assets.size)
+        assertEquals(11, assets.size)
         assertEquals(
             listOf(
+                "background",
                 "world",
                 "openai_preset",
                 "textgen_preset",
@@ -132,10 +133,11 @@ class SillyTavernResourceImporterTest {
             ),
             assets.map { it.type },
         )
-        assertTrue(assets[8].downloadUrl.endsWith("default_Seraphina.png"))
-        assertTrue(assets[1].downloadUrl.contains("presets/openai/Default.json"))
-        assertTrue(assets[5].downloadUrl.contains("Llama%203%20Instruct.json"))
-        assertTrue(assets[7].downloadUrl.contains("Think%20XML.json"))
+        assertTrue(assets[9].downloadUrl.endsWith("default_Seraphina.png"))
+        assertTrue(assets[0].downloadUrl.contains("backgrounds/tavern%20day.jpg"))
+        assertTrue(assets[2].downloadUrl.contains("presets/openai/Default.json"))
+        assertTrue(assets[6].downloadUrl.contains("Llama%203%20Instruct.json"))
+        assertTrue(assets[8].downloadUrl.contains("Think%20XML.json"))
         assertEquals(
             "https://api.github.com/repos/SillyTavern/SillyTavern/contents/default/content/Seraphina?ref=release",
             sillyTavernSpritesDirectoryApiUrl(assets.last().filename),

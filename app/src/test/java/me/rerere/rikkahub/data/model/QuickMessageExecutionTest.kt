@@ -145,6 +145,57 @@ class QuickMessageExecutionTest {
     }
 
     @Test
+    fun `expression-set slash command requests expression change without sending`() {
+        val quickMessage = QuickMessage(
+            title = "Joy",
+            content = "/expression-set joy",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "Keep this draft",
+        )
+
+        assertEquals("Keep this draft", plan.inputText)
+        assertEquals(false, plan.inputUpdated)
+        assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
+        assertEquals("joy", plan.expressionLabel)
+    }
+
+    @Test
+    fun `expression-set slash command accepts pipe value`() {
+        val quickMessage = QuickMessage(
+            title = "Pipe expression",
+            content = "/pass neutral | /expression-set",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals("neutral", plan.expressionLabel)
+    }
+
+    @Test
+    fun `expression-set slash command accepts named expression argument`() {
+        val quickMessage = QuickMessage(
+            title = "Named expression",
+            content = "/expression-set name=\"smug\"",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals("smug", plan.expressionLabel)
+    }
+
+    @Test
     fun `unsupported slash command is reported while compatible commands still run`() {
         val quickMessage = QuickMessage(
             title = "Mixed",

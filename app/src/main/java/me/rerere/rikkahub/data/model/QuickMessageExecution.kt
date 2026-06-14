@@ -13,6 +13,7 @@ data class QuickMessageExecutionPlan(
     val localVariables: Map<String, String> = emptyMap(),
     val globalVariables: Map<String, String> = emptyMap(),
     val variablesUpdated: Boolean = false,
+    val expressionLabel: String? = null,
 )
 
 data class QuickMessageChatMessage(
@@ -99,6 +100,7 @@ private fun executeQuickMessageSlashCommands(
     var sendMode = QuickMessageSendMode.NONE
     var hasCompatibleCommand = false
     var hasInputUpdate = false
+    var expressionLabel: String? = null
     val unsupported = mutableListOf<String>()
     val toastMessages = mutableListOf<String>()
     val chatMessages = mutableListOf<QuickMessageChatMessage>()
@@ -284,6 +286,17 @@ private fun executeQuickMessageSlashCommands(
                 }
             }
 
+            "expression-set" -> {
+                hasCompatibleCommand = true
+                val label = resolveExpressionLabel(arguments, args, pipe)
+                if (label.isNotBlank()) {
+                    expressionLabel = label
+                    pipe = label
+                } else {
+                    unsupported += "/${command.name}"
+                }
+            }
+
             "/", "#", "breakpoint", "parser-flag" -> {
                 hasCompatibleCommand = true
             }
@@ -306,6 +319,7 @@ private fun executeQuickMessageSlashCommands(
         localVariables = state.localVariables(),
         globalVariables = state.globalVariables(),
         variablesUpdated = state.variablesUpdated(),
+        expressionLabel = expressionLabel,
     )
 }
 
@@ -430,6 +444,17 @@ private fun resolveVariableNameAndValue(
     val (name, rest) = splitFirstSlashArgument(args)
     return name to (namedValue ?: resolveSlashArgument(rest, pipe))
 }
+
+private fun resolveExpressionLabel(
+    arguments: SlashArguments,
+    args: String,
+    pipe: String,
+): String =
+    arguments.named["name"]
+        ?: arguments.named["expression"]
+        ?: arguments.named["sprite"]
+        ?: arguments.named["label"]
+        ?: resolveSlashArgument(args, pipe)
 
 private fun splitFirstSlashArgument(value: String): Pair<String, String> {
     val trimmed = value.trimStart()

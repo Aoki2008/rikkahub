@@ -257,6 +257,7 @@ private fun parseSpriteFile(json: JsonObject): SillyTavernSpriteFile? {
 }
 
 private val SillyTavernCompatibleAssetTypes = setOf(
+    "background",
     "world",
     "openai_preset",
     "textgen_preset",

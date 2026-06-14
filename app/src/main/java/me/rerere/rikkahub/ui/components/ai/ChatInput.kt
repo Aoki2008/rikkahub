@@ -147,6 +147,7 @@ fun ChatInput(
     onLongSendClick: () -> Unit,
     onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
     onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
+    onApplyQuickMessageExpression: (String) -> Unit,
 ) {
     val toaster = LocalToaster.current
     val assistant = settings.getCurrentAssistant()
@@ -391,6 +392,7 @@ fun ChatInput(
                         onSendMessageWithoutAnswer = { sendMessageWithoutAnswer() },
                         onApplyQuickMessageVariables = onApplyQuickMessageVariables,
                         onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
+                        onApplyQuickMessageExpression = onApplyQuickMessageExpression,
                     )
 
                     Row(
@@ -607,6 +609,7 @@ private fun TextInputRow(
     onSendMessageWithoutAnswer: () -> Unit,
     onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
     onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
+    onApplyQuickMessageExpression: (String) -> Unit,
 ) {
     val settings = LocalSettings.current
     val filesManager: FilesManager = koinInject()
@@ -727,6 +730,7 @@ private fun TextInputRow(
                         onSendMessageWithoutAnswer = onSendMessageWithoutAnswer,
                         onApplyQuickMessageVariables = onApplyQuickMessageVariables,
                         onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
+                        onApplyQuickMessageExpression = onApplyQuickMessageExpression,
                     )
                 }
             } else null,
@@ -749,6 +753,7 @@ private fun QuickMessageButton(
     onSendMessageWithoutAnswer: () -> Unit,
     onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
     onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
+    onApplyQuickMessageExpression: (String) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val toaster = LocalToaster.current
@@ -792,6 +797,7 @@ private fun QuickMessageButton(
                         plan.toastMessages.forEach { message ->
                             toaster.show(message = message)
                         }
+                        plan.expressionLabel?.let(onApplyQuickMessageExpression)
                         plan.unsupportedCommands.forEach { command ->
                             toaster.show(
                                 message = unsupportedCommandMessage.format(command),

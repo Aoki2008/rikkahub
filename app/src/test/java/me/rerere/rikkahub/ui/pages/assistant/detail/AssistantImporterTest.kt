@@ -4,8 +4,10 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.ExpressionSprite
+import me.rerere.rikkahub.data.model.ExpressionSelectionStatus
 import me.rerere.rikkahub.data.model.chatAvatar
 import me.rerere.rikkahub.data.model.defaultExpressionLabel
+import me.rerere.rikkahub.data.model.selectExpression
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -65,5 +67,47 @@ class AssistantImporterTest {
         assertEquals("file://joy.png", (avatar as Avatar.Image).url)
         assertEquals("content://character-card.png", (assistant.avatar as Avatar.Image).url)
         assertEquals("neutral", assistant.expressionSprites.defaultExpressionLabel())
+    }
+
+    @Test
+    fun `select expression matches sprites case insensitively`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(
+                ExpressionSprite(label = "Neutral", imageUrl = "file://neutral.png"),
+                ExpressionSprite(label = "Joy", imageUrl = "file://joy.png"),
+            ),
+        )
+
+        val result = assistant.selectExpression("joy")
+
+        assertEquals(ExpressionSelectionStatus.SELECTED, result.status)
+        assertEquals("Joy", result.assistant.selectedExpression)
+        assertTrue(result.assistant.useAssistantAvatar)
+    }
+
+    @Test
+    fun `select expression reset clears selected expression`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(ExpressionSprite(label = "Joy", imageUrl = "file://joy.png")),
+            selectedExpression = "Joy",
+        )
+
+        val result = assistant.selectExpression("reset")
+
+        assertEquals(ExpressionSelectionStatus.CLEARED, result.status)
+        assertNull(result.assistant.selectedExpression)
+    }
+
+    @Test
+    fun `select expression leaves assistant unchanged for unknown label`() {
+        val assistant = parse("content://character-card.png").copy(
+            expressionSprites = listOf(ExpressionSprite(label = "Joy", imageUrl = "file://joy.png")),
+            selectedExpression = "Joy",
+        )
+
+        val result = assistant.selectExpression("sad")
+
+        assertEquals(ExpressionSelectionStatus.NOT_FOUND, result.status)
+        assertEquals(assistant, result.assistant)
     }
 }

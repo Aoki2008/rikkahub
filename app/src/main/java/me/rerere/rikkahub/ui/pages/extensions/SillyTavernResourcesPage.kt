@@ -243,7 +243,7 @@ private val SillyTavernExtensionCatalog = listOf(
     SillyTavernExtensionCompat(
         name = "Quick Replies",
         status = SillyTavernExtensionStatus.Native,
-        description = "Imported as quick messages. STScript slash-command coverage is being expanded natively.",
+        description = "Imported as quick messages with native pipe, variable, send, chat-message, and /expression-set support.",
     ),
     SillyTavernExtensionCompat(
         name = "Regex Scripts",
@@ -268,7 +268,12 @@ private val SillyTavernExtensionCatalog = listOf(
     SillyTavernExtensionCompat(
         name = "Sprites / Character Expressions",
         status = SillyTavernExtensionStatus.Native,
-        description = "Official sprite folders import as native expression images and can be selected per character.",
+        description = "Official sprite folders import as native expression images and can be selected manually or by Quick Reply.",
+    ),
+    SillyTavernExtensionCompat(
+        name = "Backgrounds",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Official background assets import as the current character chat background.",
     ),
     SillyTavernExtensionCompat(
         name = "TTS",

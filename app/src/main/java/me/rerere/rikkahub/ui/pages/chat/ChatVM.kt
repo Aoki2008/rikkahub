@@ -26,14 +26,17 @@ import me.rerere.ai.ui.isEmptyInputMessage
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.SettingsStore
+import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.ExpressionSelectionStatus
 import me.rerere.rikkahub.data.model.MessageNode
 import me.rerere.rikkahub.data.model.NodeFavoriteTarget
 import me.rerere.rikkahub.data.model.QuickMessageChatMessage
+import me.rerere.rikkahub.data.model.selectExpression
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.FavoriteRepository
 import me.rerere.rikkahub.service.ChatError
@@ -191,6 +194,38 @@ class ChatVM(
             triggerGeneration = triggerGeneration,
             localVariables = localVariables,
         )
+    }
+
+    fun applyQuickMessageExpression(
+        label: String,
+        onResult: (ExpressionSelectionStatus) -> Unit,
+    ) {
+        viewModelScope.launch {
+            var status = ExpressionSelectionStatus.IGNORED
+            settingsStore.update { settings ->
+                val assistant = settings.getCurrentAssistant()
+                val result = assistant.selectExpression(label)
+                status = result.status
+                when (result.status) {
+                    ExpressionSelectionStatus.SELECTED,
+                    ExpressionSelectionStatus.CLEARED -> {
+                        if (result.assistant == assistant) {
+                            settings
+                        } else {
+                            settings.copy(
+                                assistants = settings.assistants.map { item ->
+                                    if (item.id == assistant.id) result.assistant else item
+                                }
+                            )
+                        }
+                    }
+
+                    ExpressionSelectionStatus.NOT_FOUND,
+                    ExpressionSelectionStatus.IGNORED -> settings
+                }
+            }
+            onResult(status)
+        }
     }
 
     fun handleMessageEdit(parts: List<UIMessagePart>, messageId: Uuid) {

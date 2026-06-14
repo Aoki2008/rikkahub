@@ -77,6 +77,46 @@ fun List<ExpressionSprite>.defaultExpressionLabel(): String? =
     firstOrNull { it.label.expressionKey() == "neutral" }?.label
         ?: firstOrNull()?.label
 
+data class ExpressionSelectionResult(
+    val assistant: Assistant,
+    val status: ExpressionSelectionStatus,
+)
+
+enum class ExpressionSelectionStatus {
+    SELECTED,
+    CLEARED,
+    NOT_FOUND,
+    IGNORED,
+}
+
+fun Assistant.selectExpression(label: String): ExpressionSelectionResult {
+    val key = label.expressionKey()
+    if (key.isBlank()) {
+        return ExpressionSelectionResult(this, ExpressionSelectionStatus.IGNORED)
+    }
+
+    if (key in expressionResetKeys) {
+        return ExpressionSelectionResult(
+            assistant = copy(selectedExpression = null),
+            status = ExpressionSelectionStatus.CLEARED,
+        )
+    }
+
+    val sprite = expressionSprites.firstOrNull { sprite ->
+        sprite.label.expressionKey() == key
+    } ?: return ExpressionSelectionResult(this, ExpressionSelectionStatus.NOT_FOUND)
+
+    return ExpressionSelectionResult(
+        assistant = copy(
+            selectedExpression = sprite.label,
+            useAssistantAvatar = true,
+        ),
+        status = ExpressionSelectionStatus.SELECTED,
+    )
+}
+
+private val expressionResetKeys = setOf("default", "none", "reset", "clear", "off")
+
 private fun String.expressionKey(): String =
     trim().lowercase()
 

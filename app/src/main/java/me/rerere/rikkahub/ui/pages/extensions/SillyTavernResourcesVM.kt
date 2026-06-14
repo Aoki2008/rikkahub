@@ -5,12 +5,17 @@ import android.net.Uri
 import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -25,6 +30,7 @@ import me.rerere.rikkahub.data.files.saveUploadFromBytes
 import me.rerere.rikkahub.data.model.ExpressionSprite
 import me.rerere.rikkahub.data.model.SillyTavernMarketAsset
 import me.rerere.rikkahub.data.model.SillyTavernResourceImport
+import me.rerere.rikkahub.data.model.SillyTavernSpriteFile
 import me.rerere.rikkahub.data.model.defaultExpressionLabel
 import me.rerere.rikkahub.data.model.parseSillyTavernContentIndex
 import me.rerere.rikkahub.data.model.parseSillyTavernResources
@@ -51,14 +57,16 @@ data class SillyTavernResourcesUiState(
 data class SillyTavernImportReport(
     val assistantCount: Int = 0,
     val spriteCount: Int = 0,
+    val backgroundCount: Int = 0,
     val resources: SillyTavernResourceImport = SillyTavernResourceImport(),
 ) {
     val appliedCount: Int
-        get() = assistantCount + spriteCount + resources.globalResourceCount + resources.regexes.size
+        get() = assistantCount + spriteCount + backgroundCount + resources.globalResourceCount + resources.regexes.size
 
     fun summary(): String = buildList {
         if (assistantCount > 0) add("characters $assistantCount")
         if (spriteCount > 0) add("sprites $spriteCount")
+        if (backgroundCount > 0) add("backgrounds $backgroundCount")
         if (resources.promptPresets.isNotEmpty()) add("chat presets ${resources.promptPresets.size}")
         if (resources.contextPresets.isNotEmpty()) add("context presets ${resources.contextPresets.size}")
         if (resources.instructPresets.isNotEmpty()) add("instruct presets ${resources.instructPresets.size}")
@@ -155,6 +163,8 @@ class SillyTavernResourcesVM(
 
                     "sprites" -> importSprites(asset)
 
+                    "background" -> importBackground(asset)
+
                     else -> importJsonText(
                         jsonText = downloadText(asset.downloadUrl),
                         fallbackName = asset.displayName,
@@ -226,19 +236,56 @@ class SillyTavernResourcesVM(
         if (spriteFiles.isEmpty()) {
             error("No SillyTavern sprite images found")
         }
-        val sprites = spriteFiles.map { sprite ->
-            val saved = filesManager.saveUploadFromBytes(
-                bytes = downloadBytes(sprite.downloadUrl),
-                displayName = "${asset.displayName}_${sprite.fileName}",
-                mimeType = sprite.fileName.toImageMimeType(),
-            )
-            ExpressionSprite(
-                label = sprite.label,
-                imageUrl = filesManager.getFile(saved).toUri().toString(),
-            )
-        }
+        val sprites = downloadAndSaveSprites(asset.displayName, spriteFiles)
         applySprites(characterName = asset.displayName, sprites = sprites)
         return SillyTavernImportReport(spriteCount = sprites.size)
+    }
+
+    private suspend fun downloadAndSaveSprites(
+        displayName: String,
+        spriteFiles: List<SillyTavernSpriteFile>,
+    ): List<ExpressionSprite> = coroutineScope {
+        val downloadLimiter = Semaphore(4)
+        spriteFiles.map { sprite ->
+            async(Dispatchers.IO) {
+                downloadLimiter.withPermit {
+                    val saved = filesManager.saveUploadFromBytes(
+                        bytes = downloadBytes(sprite.downloadUrl),
+                        displayName = "${displayName}_${sprite.fileName}",
+                        mimeType = sprite.fileName.toImageMimeType(),
+                    )
+                    ExpressionSprite(
+                        label = sprite.label,
+                        imageUrl = filesManager.getFile(saved).toUri().toString(),
+                    )
+                }
+            }
+        }.awaitAll()
+    }
+
+    private suspend fun importBackground(asset: SillyTavernMarketAsset): SillyTavernImportReport {
+        val saved = filesManager.saveUploadFromBytes(
+            bytes = downloadBytes(asset.downloadUrl),
+            displayName = asset.filename.substringAfterLast('/'),
+            mimeType = asset.filename.toImageMimeType(),
+        )
+        val backgroundUri = filesManager.getFile(saved).toUri().toString()
+        settingsStore.update { settings ->
+            settings.copy(
+                assistants = settings.assistants.map { assistant ->
+                    if (assistant.id == settings.assistantId) {
+                        assistant.copy(
+                            background = backgroundUri,
+                            backgroundOpacity = 1.0f,
+                            useGradientBackground = false,
+                        )
+                    } else {
+                        assistant
+                    }
+                }
+            )
+        }
+        return SillyTavernImportReport(backgroundCount = 1)
     }
 
     private fun parseCharacterCardJsonOrNull(

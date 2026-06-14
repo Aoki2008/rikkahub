@@ -34,6 +34,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -60,6 +61,7 @@ import me.rerere.rikkahub.data.datastore.getCurrentAssistant
 import me.rerere.rikkahub.data.datastore.getCurrentChatModel
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Conversation
+import me.rerere.rikkahub.data.model.ExpressionSelectionStatus
 import me.rerere.rikkahub.service.ChatError
 import me.rerere.rikkahub.ui.components.ai.ChatInput
 import me.rerere.rikkahub.ui.context.LocalNavController
@@ -251,6 +253,7 @@ private fun ChatPageContent(
 ) {
     val scope = rememberCoroutineScope()
     val toaster = LocalToaster.current
+    val context = LocalContext.current
     var previewMode by rememberSaveable { mutableStateOf(false) }
     val hazeState = rememberHazeState()
 
@@ -343,6 +346,16 @@ private fun ChatPageContent(
                             vm.applyQuickMessageChatMessages(messages, triggerGeneration, localVariables)
                             scope.launch {
                                 chatListState.requestScrollToItem(conversation.messageNodes.size + messages.size + 5)
+                            }
+                        }
+                    },
+                    onApplyQuickMessageExpression = { label ->
+                        vm.applyQuickMessageExpression(label) { status ->
+                            if (status == ExpressionSelectionStatus.NOT_FOUND) {
+                                toaster.show(
+                                    message = context.getString(R.string.quick_messages_expression_missing, label),
+                                    type = ToastType.Warning,
+                                )
                             }
                         }
                     },
