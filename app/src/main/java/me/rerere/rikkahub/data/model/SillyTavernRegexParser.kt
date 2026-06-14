@@ -98,7 +98,7 @@ private fun normalizeSillyTavernFindRegex(value: String): String {
 
 private fun normalizeSillyTavernReplaceString(value: String): String =
     value
-        .replace(Regex("\\{\\{match}}", RegexOption.IGNORE_CASE), "\$0")
+        .replace(Regex("\\{\\{match\\}\\}", RegexOption.IGNORE_CASE), "\$0")
         .replace(Regex("\\$<([A-Za-z][A-Za-z0-9_]*)>")) { "\${${it.groupValues[1]}}" }
 
 private data class JavaScriptRegexLiteral(
