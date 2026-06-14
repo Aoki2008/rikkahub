@@ -75,13 +75,13 @@ private fun executeQuickMessageSlashCommands(input: String): QuickMessageExecuti
         val args = stripLeadingNamedArguments(command.args).trim()
         when (command.name.lowercase()) {
             "setinput", "input" -> {
-                inputText = unquoteSlashArgument(args)
+                inputText = resolveSlashArgument(args, pipe)
                 pipe = inputText
                 sendMode = QuickMessageSendMode.NONE
             }
 
             "send" -> {
-                inputText = unquoteSlashArgument(args)
+                inputText = resolveSlashArgument(args, pipe)
                 pipe = inputText
                 sendMode = QuickMessageSendMode.WITHOUT_RESPONSE
             }
@@ -220,3 +220,6 @@ private fun unquoteSlashArgument(value: String): String {
     }
     return trimmed
 }
+
+private fun resolveSlashArgument(args: String, pipe: String): String =
+    if (args.isBlank()) pipe else unquoteSlashArgument(args)
