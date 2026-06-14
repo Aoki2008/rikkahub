@@ -324,6 +324,16 @@ private fun ChatPageContent(
                         }
                         inputState.clearInput()
                     },
+                    onApplyQuickMessageChatMessages = { messages, triggerGeneration ->
+                        if (triggerGeneration && currentChatModel == null) {
+                            toaster.show("请先选择模型", type = ToastType.Error)
+                        } else {
+                            vm.applyQuickMessageChatMessages(messages, triggerGeneration)
+                            scope.launch {
+                                chatListState.requestScrollToItem(conversation.messageNodes.size + messages.size + 5)
+                            }
+                        }
+                    },
                     onUpdateChatModel = {
                         vm.setChatModel(assistant = setting.getCurrentAssistant(), model = it)
                     },

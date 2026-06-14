@@ -44,7 +44,9 @@ data class Conversation(
      */
     val currentMessages
         get(): List<UIMessage> {
-            return messageNodes.map { node -> node.messages[node.selectIndex] }
+            return messageNodes
+                .filterNot { it.hiddenFromAi }
+                .map { node -> node.messages[node.selectIndex] }
         }
 
     fun getMessageNodeByMessage(message: UIMessage): MessageNode? {
@@ -57,10 +59,13 @@ data class Conversation(
 
     fun updateCurrentMessages(messages: List<UIMessage>): Conversation {
         val newNodes = this.messageNodes.toMutableList()
+        val visibleNodeIndexes = newNodes.mapIndexedNotNull { index, node ->
+            index.takeUnless { node.hiddenFromAi }
+        }
 
         messages.forEachIndexed { index, message ->
-            val node = newNodes
-                .getOrElse(index) { message.toMessageNode() }
+            val nodeIndex = visibleNodeIndexes.getOrNull(index)
+            val node = nodeIndex?.let { newNodes[it] } ?: message.toMessageNode()
 
             val newMessages = node.messages.toMutableList()
             var newMessageIndex = node.selectIndex
@@ -77,10 +82,10 @@ data class Conversation(
             )
 
             // 更新newNodes
-            if (index > newNodes.lastIndex) {
+            if (nodeIndex == null) {
                 newNodes.add(newNode)
             } else {
-                newNodes[index] = newNode
+                newNodes[nodeIndex] = newNode
             }
         }
 
@@ -111,6 +116,7 @@ data class MessageNode(
     val id: Uuid = Uuid.random(),
     val messages: List<UIMessage>,
     val selectIndex: Int = 0,
+    val hiddenFromAi: Boolean = false,
     @Transient
     val isFavorite: Boolean = false,
 ) {

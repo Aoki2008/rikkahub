@@ -107,6 +107,7 @@ import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.QuickMessageChatMessage
 import me.rerere.rikkahub.data.model.QuickMessageSendMode
 import me.rerere.rikkahub.data.model.buildQuickMessageExecutionPlan
 import me.rerere.rikkahub.ui.components.ui.KeepScreenOn
@@ -144,6 +145,7 @@ fun ChatInput(
     onCancelClick: () -> Unit,
     onSendClick: () -> Unit,
     onLongSendClick: () -> Unit,
+    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean) -> Unit,
 ) {
     val toaster = LocalToaster.current
     val assistant = settings.getCurrentAssistant()
@@ -385,6 +387,7 @@ fun ChatInput(
                         state = state,
                         onSendMessage = { sendMessage() },
                         onSendMessageWithoutAnswer = { sendMessageWithoutAnswer() },
+                        onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
                     )
 
                     Row(
@@ -598,6 +601,7 @@ private fun TextInputRow(
     state: ChatInputState,
     onSendMessage: () -> Unit,
     onSendMessageWithoutAnswer: () -> Unit,
+    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean) -> Unit,
 ) {
     val settings = LocalSettings.current
     val filesManager: FilesManager = koinInject()
@@ -714,6 +718,7 @@ private fun TextInputRow(
                         state = state,
                         onSendMessage = onSendMessage,
                         onSendMessageWithoutAnswer = onSendMessageWithoutAnswer,
+                        onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
                     )
                 }
             } else null,
@@ -732,6 +737,7 @@ private fun QuickMessageButton(
     state: ChatInputState,
     onSendMessage: () -> Unit,
     onSendMessageWithoutAnswer: () -> Unit,
+    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val toaster = LocalToaster.current
@@ -755,7 +761,9 @@ private fun QuickMessageButton(
                             quickMessage = quickMessage,
                             currentInput = state.textContent.text.toString(),
                         )
-                        state.setMessageText(plan.inputText)
+                        if (plan.inputUpdated) {
+                            state.setMessageText(plan.inputText)
+                        }
                         plan.toastMessages.forEach { message ->
                             toaster.show(message = message)
                         }
@@ -766,10 +774,24 @@ private fun QuickMessageButton(
                             )
                         }
                         expanded = false
-                        when (plan.sendMode) {
-                            QuickMessageSendMode.NONE -> Unit
-                            QuickMessageSendMode.NORMAL -> onSendMessage()
-                            QuickMessageSendMode.WITHOUT_RESPONSE -> onSendMessageWithoutAnswer()
+                        if (plan.chatMessages.isNotEmpty()) {
+                            onApplyQuickMessageChatMessages(
+                                plan.chatMessages,
+                                plan.sendMode == QuickMessageSendMode.NORMAL,
+                            )
+                        } else {
+                            when (plan.sendMode) {
+                                QuickMessageSendMode.NONE -> Unit
+                                QuickMessageSendMode.NORMAL -> {
+                                    if (plan.inputUpdated) {
+                                        onSendMessage()
+                                    } else {
+                                        onApplyQuickMessageChatMessages(emptyList(), true)
+                                    }
+                                }
+
+                                QuickMessageSendMode.WITHOUT_RESPONSE -> onSendMessageWithoutAnswer()
+                            }
                         }
                     },
                     color = Color.Transparent,

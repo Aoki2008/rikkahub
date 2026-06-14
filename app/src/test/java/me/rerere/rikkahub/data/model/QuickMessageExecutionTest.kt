@@ -1,5 +1,6 @@
 package me.rerere.rikkahub.data.model
 
+import me.rerere.ai.core.MessageRole
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -159,5 +160,99 @@ class QuickMessageExecutionTest {
         assertEquals("Search hallway", plan.inputText)
         assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
         assertEquals(listOf("/imagine"), plan.unsupportedCommands)
+    }
+
+    @Test
+    fun `sys command appends neutral system narrator message`() {
+        val quickMessage = QuickMessage(
+            title = "Narrator",
+            content = "/sys The clock strikes midnight.",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "draft",
+        )
+
+        assertEquals("draft", plan.inputText)
+        assertEquals(QuickMessageSendMode.NONE, plan.sendMode)
+        assertEquals(
+            listOf(
+                QuickMessageChatMessage(
+                    role = MessageRole.SYSTEM,
+                    text = "The clock strikes midnight.",
+                )
+            ),
+            plan.chatMessages,
+        )
+    }
+
+    @Test
+    fun `comment command appends AI-invisible chat note`() {
+        val quickMessage = QuickMessage(
+            title = "Note",
+            content = "/comment Remember the secret door is west.",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(
+            listOf(
+                QuickMessageChatMessage(
+                    role = MessageRole.SYSTEM,
+                    text = "Remember the secret door is west.",
+                    hiddenFromAi = true,
+                )
+            ),
+            plan.chatMessages,
+        )
+    }
+
+    @Test
+    fun `sendas command records requested character name`() {
+        val quickMessage = QuickMessage(
+            title = "Bob speaks",
+            content = "/sendas name=\"Bob\" I saw {{pipe}}.",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(
+            listOf(
+                QuickMessageChatMessage(
+                    role = MessageRole.ASSISTANT,
+                    text = "I saw .",
+                    senderName = "Bob",
+                )
+            ),
+            plan.chatMessages,
+        )
+    }
+
+    @Test
+    fun `trigger without input requests generation without clearing draft`() {
+        val quickMessage = QuickMessage(
+            title = "Continue",
+            content = "/trigger",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "unfinished draft",
+        )
+
+        assertEquals("unfinished draft", plan.inputText)
+        assertEquals(false, plan.inputUpdated)
+        assertEquals(QuickMessageSendMode.NORMAL, plan.sendMode)
     }
 }

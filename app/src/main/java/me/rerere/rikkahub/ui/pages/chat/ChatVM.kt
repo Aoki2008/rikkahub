@@ -33,6 +33,7 @@ import me.rerere.rikkahub.data.model.Avatar
 import me.rerere.rikkahub.data.model.Conversation
 import me.rerere.rikkahub.data.model.MessageNode
 import me.rerere.rikkahub.data.model.NodeFavoriteTarget
+import me.rerere.rikkahub.data.model.QuickMessageChatMessage
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.FavoriteRepository
 import me.rerere.rikkahub.service.ChatError
@@ -177,6 +178,17 @@ class ChatVM(
         analytics.logEvent("ai_send_message", null)
 
         chatService.sendMessage(_conversationId, content, answer)
+    }
+
+    fun applyQuickMessageChatMessages(
+        messages: List<QuickMessageChatMessage>,
+        triggerGeneration: Boolean,
+    ) {
+        chatService.applyQuickMessageChatMessages(
+            conversationId = _conversationId,
+            messages = messages,
+            triggerGeneration = triggerGeneration,
+        )
     }
 
     fun handleMessageEdit(parts: List<UIMessagePart>, messageId: Uuid) {

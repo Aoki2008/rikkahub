@@ -1,10 +1,21 @@
 package me.rerere.rikkahub.data.model
 
+import me.rerere.ai.core.MessageRole
+
 data class QuickMessageExecutionPlan(
     val inputText: String,
     val sendMode: QuickMessageSendMode,
+    val inputUpdated: Boolean = true,
     val unsupportedCommands: List<String> = emptyList(),
     val toastMessages: List<String> = emptyList(),
+    val chatMessages: List<QuickMessageChatMessage> = emptyList(),
+)
+
+data class QuickMessageChatMessage(
+    val role: MessageRole,
+    val text: String,
+    val senderName: String? = null,
+    val hiddenFromAi: Boolean = false,
 )
 
 enum class QuickMessageSendMode {
@@ -24,6 +35,7 @@ fun buildQuickMessageExecutionPlan(
         return QuickMessageExecutionPlan(
             inputText = input,
             sendMode = QuickMessageSendMode.NONE,
+            inputUpdated = true,
             unsupportedCommands = listOf(input.trim()),
         )
     }
@@ -68,6 +80,7 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
     var hasInputUpdate = false
     val unsupported = mutableListOf<String>()
     val toastMessages = mutableListOf<String>()
+    val chatMessages = mutableListOf<QuickMessageChatMessage>()
 
     for (commandText in splitSlashPipeline(input)) {
         val command = parseSlashCommand(commandText)
@@ -76,9 +89,8 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
             continue
         }
 
-        val args = stripLeadingNamedArguments(command.args)
-            .replacePipeMacro(pipe)
-            .trim()
+        val arguments = parseSlashArguments(command.args, pipe)
+        val args = arguments.unnamed
         when (command.name.lowercase()) {
             "pass" -> {
                 hasCompatibleCommand = true
@@ -103,10 +115,6 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
 
             "trigger", "gen", "generate" -> {
                 hasCompatibleCommand = true
-                if (inputText.isBlank() && pipe.isNotBlank()) {
-                    inputText = pipe
-                    hasInputUpdate = true
-                }
                 sendMode = QuickMessageSendMode.NORMAL
             }
 
@@ -121,6 +129,46 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
             "return" -> {
                 hasCompatibleCommand = true
                 pipe = resolveSlashArgument(args, pipe)
+            }
+
+            "sys" -> {
+                hasCompatibleCommand = true
+                val message = resolveSlashArgument(args, pipe)
+                if (message.isNotBlank()) {
+                    chatMessages += QuickMessageChatMessage(
+                        role = MessageRole.SYSTEM,
+                        text = message,
+                    )
+                    pipe = message
+                }
+            }
+
+            "comment" -> {
+                hasCompatibleCommand = true
+                val message = resolveSlashArgument(args, pipe)
+                if (message.isNotBlank()) {
+                    chatMessages += QuickMessageChatMessage(
+                        role = MessageRole.SYSTEM,
+                        text = message,
+                        hiddenFromAi = true,
+                    )
+                    pipe = message
+                }
+            }
+
+            "sendas" -> {
+                hasCompatibleCommand = true
+                val message = resolveSlashArgument(args, pipe)
+                if (message.isNotBlank()) {
+                    chatMessages += QuickMessageChatMessage(
+                        role = MessageRole.ASSISTANT,
+                        text = message,
+                        senderName = arguments.named["name"]
+                            ?: arguments.named["character"]
+                            ?: arguments.named["char"],
+                    )
+                    pipe = message
+                }
             }
 
             "/", "#", "breakpoint", "parser-flag" -> {
@@ -138,8 +186,10 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
     return QuickMessageExecutionPlan(
         inputText = if (hasInputUpdate) inputText else currentInput,
         sendMode = sendMode,
+        inputUpdated = hasInputUpdate,
         unsupportedCommands = unsupported,
         toastMessages = toastMessages,
+        chatMessages = chatMessages,
     )
 }
 
@@ -225,6 +275,34 @@ private fun splitSlashPipeline(input: String): List<String> {
     return parts
 }
 
+private data class SlashArguments(
+    val named: Map<String, String>,
+    val unnamed: String,
+)
+
+private fun parseSlashArguments(args: String, pipe: String): SlashArguments {
+    var remaining = args.trimStart()
+    val named = mutableMapOf<String, String>()
+
+    while (true) {
+        val match = leadingNamedArgumentRegex.find(remaining) ?: break
+        val key = match.groupValues[1].lowercase()
+        val value = match.groupValues
+            .drop(2)
+            .firstOrNull { it.isNotEmpty() }
+            .orEmpty()
+            .unescapeSlashArgument()
+            .replacePipeMacro(pipe)
+        named[key] = value
+        remaining = remaining.substring(match.range.last + 1).trimStart()
+    }
+
+    return SlashArguments(
+        named = named,
+        unnamed = remaining.replacePipeMacro(pipe).trim(),
+    )
+}
+
 private fun stripLeadingNamedArguments(args: String): String {
     var remaining = args.trimStart()
 
@@ -234,10 +312,16 @@ private fun stripLeadingNamedArguments(args: String): String {
     }
 }
 
-private val leadingNamedArgumentRegex = Regex("""^[A-Za-z_][A-Za-z0-9_-]*=(?:"(?:\\.|[^"])*"|'(?:\\.|[^'])*'|\S+)\s*""")
+private val leadingNamedArgumentRegex =
+    Regex("""^([A-Za-z_][A-Za-z0-9_-]*)=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'|(\S+))\s*""")
 
 private fun String.replacePipeMacro(pipe: String): String =
     replace("{{pipe}}", pipe)
+
+private fun String.unescapeSlashArgument(): String =
+    replace("\\\"", "\"")
+        .replace("\\'", "'")
+        .replace("\\\\", "\\")
 
 private fun unquoteSlashArgument(value: String): String {
     val trimmed = value.trim()
@@ -247,9 +331,7 @@ private fun unquoteSlashArgument(value: String): String {
     if ((first == '"' && last == '"') || (first == '\'' && last == '\'')) {
         return trimmed
             .substring(1, trimmed.lastIndex)
-            .replace("\\\"", "\"")
-            .replace("\\'", "'")
-            .replace("\\\\", "\\")
+            .unescapeSlashArgument()
     }
     return trimmed
 }

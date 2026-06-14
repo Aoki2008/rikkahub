@@ -92,6 +92,8 @@ import me.rerere.rikkahub.data.model.toMessageNode
 import me.rerere.rikkahub.data.model.buildInitialMessageNodes
 import me.rerere.rikkahub.data.model.buildGroupInitialNodes
 import me.rerere.rikkahub.data.model.GroupGreetingMember
+import me.rerere.rikkahub.data.model.MessageNode
+import me.rerere.rikkahub.data.model.QuickMessageChatMessage
 import me.rerere.rikkahub.data.repository.ConversationRepository
 import me.rerere.rikkahub.data.repository.MemoryRepository
 import me.rerere.rikkahub.web.BadRequestException
@@ -404,6 +406,81 @@ class ChatService(
         session.setJob(job)
     }
 
+    fun applyQuickMessageChatMessages(
+        conversationId: Uuid,
+        messages: List<QuickMessageChatMessage>,
+        triggerGeneration: Boolean,
+    ) {
+        if (messages.isEmpty() && !triggerGeneration) return
+
+        val session = getOrCreateSession(conversationId)
+        val previousJob = session.getJob()
+        previousJob?.cancel()
+
+        val job = appScope.launch {
+            try {
+                runCatching { previousJob?.join() }
+                finishInterruptedPendingTools(conversationId)
+
+                val settings = settingsStore.settingsFlow.first()
+                val currentConversation = session.state.value
+                val nodes = messages.mapNotNull { message ->
+                    message.toMessageNode(settings, currentConversation)
+                }
+
+                if (nodes.isNotEmpty()) {
+                    saveConversation(
+                        conversationId,
+                        currentConversation.copy(
+                            messageNodes = currentConversation.messageNodes + nodes,
+                        )
+                    )
+                }
+
+                if (triggerGeneration) {
+                    handleMessageComplete(conversationId)
+                }
+
+                _generationDoneFlow.emit(conversationId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                addError(e, conversationId, title = context.getString(R.string.error_title_send_message))
+            }
+        }
+        session.setJob(job)
+    }
+
+    private fun QuickMessageChatMessage.toMessageNode(
+        settings: Settings,
+        conversation: Conversation,
+    ): MessageNode? {
+        val trimmed = text.trim()
+        if (trimmed.isBlank()) return null
+
+        return UIMessage(
+            role = role,
+            parts = listOf(UIMessagePart.Text(trimmed)),
+            senderId = senderName?.let { settings.findAssistantIdByName(it, conversation.groupId) },
+        ).toMessageNode().copy(hiddenFromAi = hiddenFromAi)
+    }
+
+    private fun Settings.findAssistantIdByName(name: String, groupId: Uuid?): Uuid? {
+        val normalized = name.trim()
+        if (normalized.isBlank()) return null
+
+        val groupMemberIds = groupId
+            ?.let { id -> chatGroups.firstOrNull { it.id == id } }
+            ?.memberIds
+            .orEmpty()
+
+        return groupMemberIds
+            .asSequence()
+            .mapNotNull(::getAssistantById)
+            .firstOrNull { it.name.equals(normalized, ignoreCase = true) }
+            ?.id
+            ?: assistants.firstOrNull { it.name.equals(normalized, ignoreCase = true) }?.id
+    }
+
     private fun preprocessUserInputParts(parts: List<UIMessagePart>, assistant: Assistant): List<UIMessagePart> {
         return parts.map { part ->
             when (part) {
@@ -449,7 +526,8 @@ class ChatService(
                     if (regenerateAssistantMsg) {
                         val node = conversation.getMessageNodeByMessage(message)
                         val nodeIndex = conversation.messageNodes.indexOf(node)
-                        handleMessageComplete(conversationId, messageRange = 0..<nodeIndex)
+                        val visibleNodeIndex = conversation.visibleMessageCountBeforeNodeIndex(nodeIndex)
+                        handleMessageComplete(conversationId, messageRange = 0..<visibleNodeIndex)
                     } else {
                         saveConversation(conversationId, conversation)
                     }
@@ -569,7 +647,7 @@ class ChatService(
 
         val responders: List<Uuid> = if (messageRange != null) {
             // 重新生成：让产出被重新生成消息的成员重做（其 senderId）；否则回退到首位激活成员
-            val regenNode = conversation.messageNodes.getOrNull(messageRange.endInclusive + 1)
+            val regenNode = conversation.visibleMessageNodes().getOrNull(messageRange.endInclusive + 1)
             val regenSenderId = regenNode?.messages?.getOrNull(regenNode.selectIndex)?.senderId
             listOfNotNull(regenSenderId ?: group.activeMembers().firstOrNull())
         } else {
@@ -759,6 +837,16 @@ class ChatService(
                 }
             }
         }
+    }
+
+    private fun Conversation.visibleMessageNodes(): List<MessageNode> =
+        messageNodes.filterNot { it.hiddenFromAi }
+
+    private fun Conversation.visibleMessageCountBeforeNodeIndex(nodeIndex: Int): Int {
+        if (nodeIndex <= 0) return 0
+        return messageNodes
+            .take(nodeIndex)
+            .count { !it.hiddenFromAi }
     }
 
     // ---- 检查无效消息 ----
