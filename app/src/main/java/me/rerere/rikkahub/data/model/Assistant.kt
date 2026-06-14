@@ -137,7 +137,7 @@ fun String.replaceRegexes(
         ) {
             try {
                 val compiledRegex = Regex(regex.findRegex)
-                val result = if (regex.trimStrings.isEmpty()) {
+                val result = if (!regex.requiresExpandedReplacement()) {
                     acc.replace(
                         regex = compiledRegex,
                         replacement = regex.replaceString,
@@ -159,6 +159,12 @@ fun String.replaceRegexes(
         }
     }
 }
+
+private fun AssistantRegex.requiresExpandedReplacement(): Boolean =
+    trimStrings.isNotEmpty() ||
+        replaceString.contains("\$0") ||
+        Regex("\\$\\{[A-Za-z][A-Za-z0-9_]*}").containsMatchIn(replaceString) ||
+        Regex("\\$<([A-Za-z][A-Za-z0-9_]*)>").containsMatchIn(replaceString)
 
 private fun expandRegexReplacement(
     replacement: String,
