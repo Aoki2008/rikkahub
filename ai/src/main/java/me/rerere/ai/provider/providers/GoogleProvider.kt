@@ -369,7 +369,7 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
             if (params.maxTokens != null) put("maxOutputTokens", params.maxTokens)
             if (params.stopSequences.isNotEmpty()) {
                 putJsonArray("stopSequences") {
-                    params.stopSequences.forEach { add(it) }
+                    params.stopSequences.forEach { add(JsonPrimitive(it)) }
                 }
             }
             if (params.model.outputModalities.contains(Modality.IMAGE)) {

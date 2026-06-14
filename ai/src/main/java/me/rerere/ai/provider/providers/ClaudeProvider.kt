@@ -284,7 +284,7 @@ class ClaudeProvider(private val client: OkHttpClient, context: Context? = null)
             if (params.topP != null) put("top_p", params.topP)
             if (params.stopSequences.isNotEmpty()) {
                 putJsonArray("stop_sequences") {
-                    params.stopSequences.forEach { add(it) }
+                    params.stopSequences.forEach { add(JsonPrimitive(it)) }
                 }
             }
 
