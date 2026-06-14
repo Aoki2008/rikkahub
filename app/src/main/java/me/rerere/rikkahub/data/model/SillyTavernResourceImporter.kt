@@ -131,7 +131,12 @@ private fun parseExplicitExportObject(
             ?.let { parseLorebookOrNull(it, name) }
             ?.let { SillyTavernResourceImport(lorebooks = listOf(it)) }
 
-        "openai_preset", "chat_completion_preset", "prompt_preset" -> data.asObjectOrNull()
+        "openai_preset",
+        "chat_completion_preset",
+        "prompt_preset",
+        "textgen_preset",
+        "kobold_preset",
+        "novel_preset" -> data.asObjectOrNull()
             ?.let { parsePromptPresetOrNull(it, name) }
             ?.let { SillyTavernResourceImport(promptPresets = listOf(it)) }
 
@@ -162,10 +167,16 @@ private fun parseExplicitExportObject(
 }
 
 private fun parsePromptPresetOrNull(json: JsonObject, fallbackName: String): PromptPreset? {
-    if (!json.containsKey("prompts") || !json.containsKey("prompt_order")) return null
+    if (
+        !json.containsKey("prompts") &&
+        !json.containsKey("prompt_order") &&
+        !json.hasSupportedSamplerPresetFields()
+    ) {
+        return null
+    }
     return runCatching { parseSillyTavernPreset(json, fallbackName) }
         .getOrNull()
-        ?.takeIf { it.prompts.isNotEmpty() || it.promptOrder.isNotEmpty() }
+        ?.takeIf { it.prompts.isNotEmpty() || it.promptOrder.isNotEmpty() || it.hasSupportedSamplerOverrides() }
 }
 
 private fun parseTextCompletionPresetOrNull(
@@ -196,6 +207,9 @@ private fun parseContentIndexAsset(json: JsonObject): SillyTavernMarketAsset? {
 private val SillyTavernCompatibleAssetTypes = setOf(
     "world",
     "openai_preset",
+    "textgen_preset",
+    "kobold_preset",
+    "novel_preset",
     "context",
     "instruct",
     "system_prompt",
@@ -218,6 +232,29 @@ private fun JsonObject.stringValue(vararg keys: String): String? =
             runCatching { element.jsonPrimitive.contentOrNull }.getOrNull()
         }
     }
+
+private fun JsonObject.hasSupportedSamplerPresetFields(): Boolean =
+    keys.any {
+        it in setOf(
+            "temperature",
+            "top_p",
+            "frequency_penalty",
+            "presence_penalty",
+            "openai_max_context",
+            "openai_max_tokens",
+            "max_context",
+            "max_length",
+            "max_tokens",
+        )
+    }
+
+private fun PromptPreset.hasSupportedSamplerOverrides(): Boolean =
+    temperature != null ||
+        topP != null ||
+        frequencyPenalty != null ||
+        presencePenalty != null ||
+        maxContext != null ||
+        maxTokens != null
 
 private fun JsonElement.asArrayOrNull(): JsonArray? =
     runCatching { jsonArray }.getOrNull()

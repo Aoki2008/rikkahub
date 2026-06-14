@@ -132,7 +132,7 @@ fun ChatInput(
     loading: Boolean,
     conversation: Conversation,
     settings: Settings,
-    mcpManager: McpManager,
+    mcpManager: McpManager?,
     hazeState: HazeState,
     enableSearch: Boolean,
     onToggleSearch: (Boolean) -> Unit,
@@ -145,7 +145,8 @@ fun ChatInput(
     onCancelClick: () -> Unit,
     onSendClick: () -> Unit,
     onLongSendClick: () -> Unit,
-    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean) -> Unit,
+    onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
+    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
 ) {
     val toaster = LocalToaster.current
     val assistant = settings.getCurrentAssistant()
@@ -384,9 +385,11 @@ fun ChatInput(
                     }
 
                     TextInputRow(
+                        conversation = conversation,
                         state = state,
                         onSendMessage = { sendMessage() },
                         onSendMessageWithoutAnswer = { sendMessageWithoutAnswer() },
+                        onApplyQuickMessageVariables = onApplyQuickMessageVariables,
                         onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
                     )
 
@@ -598,10 +601,12 @@ private fun ActionIconButton(
 
 @Composable
 private fun TextInputRow(
+    conversation: Conversation,
     state: ChatInputState,
     onSendMessage: () -> Unit,
     onSendMessageWithoutAnswer: () -> Unit,
-    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean) -> Unit,
+    onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
+    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
 ) {
     val settings = LocalSettings.current
     val filesManager: FilesManager = koinInject()
@@ -715,9 +720,12 @@ private fun TextInputRow(
                 {
                     QuickMessageButton(
                         quickMessages = quickMessages,
+                        conversation = conversation,
+                        settings = settings,
                         state = state,
                         onSendMessage = onSendMessage,
                         onSendMessageWithoutAnswer = onSendMessageWithoutAnswer,
+                        onApplyQuickMessageVariables = onApplyQuickMessageVariables,
                         onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
                     )
                 }
@@ -734,10 +742,13 @@ private fun TextInputRow(
 @Composable
 private fun QuickMessageButton(
     quickMessages: List<QuickMessage>,
+    conversation: Conversation,
+    settings: Settings,
     state: ChatInputState,
     onSendMessage: () -> Unit,
     onSendMessageWithoutAnswer: () -> Unit,
-    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean) -> Unit,
+    onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
+    onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     val toaster = LocalToaster.current
@@ -760,7 +771,21 @@ private fun QuickMessageButton(
                         val plan = buildQuickMessageExecutionPlan(
                             quickMessage = quickMessage,
                             currentInput = state.textContent.text.toString(),
+                            localVariables = conversation.scriptVariables,
+                            globalVariables = settings.scriptVariables,
                         )
+                        val persistLocalVariablesWithChatMessages =
+                            plan.variablesUpdated && plan.chatMessages.isNotEmpty()
+                        if (plan.variablesUpdated) {
+                            onApplyQuickMessageVariables(
+                                if (persistLocalVariablesWithChatMessages) {
+                                    conversation.scriptVariables
+                                } else {
+                                    plan.localVariables
+                                },
+                                plan.globalVariables,
+                            )
+                        }
                         if (plan.inputUpdated) {
                             state.setMessageText(plan.inputText)
                         }
@@ -778,6 +803,7 @@ private fun QuickMessageButton(
                             onApplyQuickMessageChatMessages(
                                 plan.chatMessages,
                                 plan.sendMode == QuickMessageSendMode.NORMAL,
+                                plan.localVariables.takeIf { persistLocalVariablesWithChatMessages },
                             )
                         } else {
                             when (plan.sendMode) {
@@ -786,7 +812,7 @@ private fun QuickMessageButton(
                                     if (plan.inputUpdated) {
                                         onSendMessage()
                                     } else {
-                                        onApplyQuickMessageChatMessages(emptyList(), true)
+                                        onApplyQuickMessageChatMessages(emptyList(), true, null)
                                     }
                                 }
 

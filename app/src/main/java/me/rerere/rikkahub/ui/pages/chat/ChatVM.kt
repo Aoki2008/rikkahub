@@ -165,7 +165,7 @@ class ChatVM(
 
     // Update checker
     val updateState =
-        updateChecker.checkUpdate().stateIn(viewModelScope, SharingStarted.Eagerly, UiState.Loading)
+        updateChecker.checkUpdate().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState.Loading)
 
     /**
      * 处理消息发送
@@ -183,11 +183,13 @@ class ChatVM(
     fun applyQuickMessageChatMessages(
         messages: List<QuickMessageChatMessage>,
         triggerGeneration: Boolean,
+        localVariables: Map<String, String>? = null,
     ) {
         chatService.applyQuickMessageChatMessages(
             conversationId = _conversationId,
             messages = messages,
             triggerGeneration = triggerGeneration,
+            localVariables = localVariables,
         )
     }
 

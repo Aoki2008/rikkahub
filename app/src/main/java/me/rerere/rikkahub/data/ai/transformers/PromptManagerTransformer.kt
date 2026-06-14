@@ -47,6 +47,7 @@ internal fun buildPromptManagerMessages(
 ): List<UIMessage>? {
     val presetId = assistant.promptPresetId ?: return null
     val preset = settings.promptPresets.firstOrNull { it.id == presetId } ?: return null
+    if (preset.orderedEnabledPrompts().isEmpty()) return messages
 
     // 聊天记录 = 去掉(由 systemPrompt 生成的)系统消息后的全部消息
     val chatHistory = messages.filterNot { it.role == MessageRole.SYSTEM }
@@ -86,4 +87,3 @@ internal fun buildPromptManagerMessages(
         )
     )
 }
-

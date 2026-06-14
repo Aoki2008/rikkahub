@@ -276,6 +276,7 @@ class ConversationRepository(
             customSystemPrompt = conversation.customSystemPrompt ?: "",
             modeInjectionIds = JsonInstant.encodeToString(conversation.modeInjectionIds),
             lorebookIds = JsonInstant.encodeToString(conversation.lorebookIds),
+            scriptVariables = JsonInstant.encodeToString(conversation.scriptVariables),
             groupId = conversation.groupId?.toString() ?: "",
         )
     }
@@ -296,6 +297,7 @@ class ConversationRepository(
             customSystemPrompt = conversationEntity.customSystemPrompt.ifEmpty { null },
             modeInjectionIds = JsonInstant.decodeFromString(conversationEntity.modeInjectionIds),
             lorebookIds = JsonInstant.decodeFromString(conversationEntity.lorebookIds),
+            scriptVariables = JsonInstant.decodeFromString(conversationEntity.scriptVariables),
             groupId = conversationEntity.groupId.ifEmpty { null }?.let { Uuid.parse(it) },
         )
     }

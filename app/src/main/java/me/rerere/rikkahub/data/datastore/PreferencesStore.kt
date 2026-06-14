@@ -148,6 +148,7 @@ class SettingsStore(
         val MODE_INJECTIONS = stringPreferencesKey("mode_injections")
         val LOREBOOKS = stringPreferencesKey("lorebooks")
         val QUICK_MESSAGES = stringPreferencesKey("quick_messages")
+        val SCRIPT_VARIABLES = stringPreferencesKey("script_variables")
 
         // 用户角色 (Persona)
         val PERSONAS = stringPreferencesKey("personas")
@@ -250,6 +251,9 @@ class SettingsStore(
                 quickMessages = preferences[QUICK_MESSAGES]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
+                scriptVariables = preferences[SCRIPT_VARIABLES]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyMap(),
                 personas = preferences[PERSONAS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
@@ -469,6 +473,7 @@ class SettingsStore(
             preferences[MODE_INJECTIONS] = JsonInstant.encodeToString(settings.modeInjections)
             preferences[LOREBOOKS] = JsonInstant.encodeToString(settings.lorebooks)
             preferences[QUICK_MESSAGES] = JsonInstant.encodeToString(settings.quickMessages)
+            preferences[SCRIPT_VARIABLES] = JsonInstant.encodeToString(settings.scriptVariables)
             preferences[PERSONAS] = JsonInstant.encodeToString(settings.personas)
             preferences[CHAT_GROUPS] = JsonInstant.encodeToString(settings.chatGroups)
             preferences[PROMPT_PRESETS] = JsonInstant.encodeToString(settings.promptPresets)
@@ -613,6 +618,7 @@ data class Settings(
     val quickMessages: List<QuickMessage> = emptyList(),
     val personas: List<Persona> = emptyList(),
     val selectedPersonaId: Uuid? = null,
+    val scriptVariables: Map<String, String> = emptyMap(),
     val chatGroups: List<ChatGroup> = emptyList(),
     val selectedGroupId: Uuid? = null,
     val promptPresets: List<PromptPreset> = emptyList(),

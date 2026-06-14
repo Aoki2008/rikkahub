@@ -40,6 +40,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import me.rerere.rikkahub.BuildConfig
+import me.rerere.rikkahub.AppLinks
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.Screen
 import me.rerere.rikkahub.ui.components.nav.BackButton
@@ -49,10 +50,6 @@ import me.rerere.rikkahub.ui.context.LocalNavController
 import me.rerere.rikkahub.ui.theme.CustomColors
 import me.rerere.rikkahub.utils.openUrl
 import me.rerere.rikkahub.utils.plus
-
-private const val PROJECT_URL = "https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity"
-private const val REPOSITORY_URL = "https://github.com/Aoki2008/rikkahub"
-private const val LICENSE_URL = "https://github.com/Aoki2008/rikkahub/blob/feat/sillytavern-parity/LICENSE"
 
 @Composable
 fun SettingAboutPage() {
@@ -161,21 +158,21 @@ fun SettingAboutPage() {
                         modifier = Modifier.padding(horizontal = 8.dp),
                     ) {
                         item(
-                            onClick = { context.openUrl(PROJECT_URL) },
+                            onClick = { context.openUrl(AppLinks.PROJECT_URL) },
                             leadingContent = { Icon(HugeIcons.Earth, null) },
-                            supportingContent = { Text(PROJECT_URL) },
+                            supportingContent = { Text(AppLinks.PROJECT_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_website)) },
                         )
                         item(
-                            onClick = { context.openUrl(REPOSITORY_URL) },
+                            onClick = { context.openUrl(AppLinks.REPOSITORY_URL) },
                             leadingContent = { Icon(HugeIcons.Github, null) },
-                            supportingContent = { Text(REPOSITORY_URL) },
+                            supportingContent = { Text(AppLinks.REPOSITORY_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_github)) },
                         )
                         item(
-                            onClick = { context.openUrl(LICENSE_URL) },
+                            onClick = { context.openUrl(AppLinks.LICENSE_URL) },
                             leadingContent = { Icon(HugeIcons.File02, null) },
-                            supportingContent = { Text(LICENSE_URL) },
+                            supportingContent = { Text(AppLinks.LICENSE_URL) },
                             headlineContent = { Text(stringResource(R.string.about_page_license)) },
                         )
                     }

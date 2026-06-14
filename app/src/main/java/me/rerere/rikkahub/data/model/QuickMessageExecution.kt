@@ -1,5 +1,6 @@
 package me.rerere.rikkahub.data.model
 
+import java.math.BigDecimal
 import me.rerere.ai.core.MessageRole
 
 data class QuickMessageExecutionPlan(
@@ -9,6 +10,9 @@ data class QuickMessageExecutionPlan(
     val unsupportedCommands: List<String> = emptyList(),
     val toastMessages: List<String> = emptyList(),
     val chatMessages: List<QuickMessageChatMessage> = emptyList(),
+    val localVariables: Map<String, String> = emptyMap(),
+    val globalVariables: Map<String, String> = emptyMap(),
+    val variablesUpdated: Boolean = false,
 )
 
 data class QuickMessageChatMessage(
@@ -27,22 +31,33 @@ enum class QuickMessageSendMode {
 fun buildQuickMessageExecutionPlan(
     quickMessage: QuickMessage,
     currentInput: String,
+    localVariables: Map<String, String> = emptyMap(),
+    globalVariables: Map<String, String> = emptyMap(),
 ): QuickMessageExecutionPlan {
     val input = composeQuickMessageInput(quickMessage, currentInput)
 
     if (quickMessage.sendImmediately && input.trimStart().startsWith("/")) {
-        executeQuickMessageSlashCommands(input, currentInput)?.let { return it }
+        executeQuickMessageSlashCommands(
+            input = input,
+            currentInput = currentInput,
+            localVariables = localVariables,
+            globalVariables = globalVariables,
+        )?.let { return it }
         return QuickMessageExecutionPlan(
             inputText = input,
             sendMode = QuickMessageSendMode.NONE,
             inputUpdated = true,
             unsupportedCommands = listOf(input.trim()),
+            localVariables = localVariables,
+            globalVariables = globalVariables,
         )
     }
 
     return QuickMessageExecutionPlan(
         inputText = input,
         sendMode = if (quickMessage.sendImmediately) QuickMessageSendMode.NORMAL else QuickMessageSendMode.NONE,
+        localVariables = localVariables,
+        globalVariables = globalVariables,
     )
 }
 
@@ -72,7 +87,13 @@ private fun joinQuickReplyInput(first: String, second: String): String =
         .filter { it.isNotEmpty() }
         .joinToString(" ")
 
-private fun executeQuickMessageSlashCommands(input: String, currentInput: String): QuickMessageExecutionPlan? {
+private fun executeQuickMessageSlashCommands(
+    input: String,
+    currentInput: String,
+    localVariables: Map<String, String>,
+    globalVariables: Map<String, String>,
+): QuickMessageExecutionPlan? {
+    val state = QuickMessageVariableState(localVariables, globalVariables)
     var inputText = ""
     var pipe = ""
     var sendMode = QuickMessageSendMode.NONE
@@ -89,7 +110,7 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
             continue
         }
 
-        val arguments = parseSlashArguments(command.args, pipe)
+        val arguments = parseSlashArguments(command.args, pipe, state)
         val args = arguments.unnamed
         when (command.name.lowercase()) {
             "pass" -> {
@@ -129,6 +150,98 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
             "return" -> {
                 hasCompatibleCommand = true
                 pipe = resolveSlashArgument(args, pipe)
+            }
+
+            "getvar" -> {
+                hasCompatibleCommand = true
+                pipe = state.getLocalOrGlobal(resolveVariableName(arguments, args))
+            }
+
+            "setvar" -> {
+                hasCompatibleCommand = true
+                val (name, value) = resolveVariableNameAndValue(arguments, args, pipe)
+                if (name.isNotBlank()) {
+                    pipe = state.setLocal(name, value)
+                }
+            }
+
+            "addvar" -> {
+                hasCompatibleCommand = true
+                val (name, increment) = resolveVariableNameAndValue(arguments, args, pipe)
+                if (name.isNotBlank()) {
+                    pipe = state.addLocal(name, increment)
+                }
+            }
+
+            "incvar" -> {
+                hasCompatibleCommand = true
+                val name = resolveVariableName(arguments, args)
+                if (name.isNotBlank()) {
+                    pipe = state.addLocal(name, "1")
+                }
+            }
+
+            "decvar" -> {
+                hasCompatibleCommand = true
+                val name = resolveVariableName(arguments, args)
+                if (name.isNotBlank()) {
+                    pipe = state.addLocal(name, "-1")
+                }
+            }
+
+            "flushvar" -> {
+                hasCompatibleCommand = true
+                val name = resolveVariableName(arguments, args)
+                if (name.isNotBlank()) {
+                    state.flushLocal(name)
+                    pipe = ""
+                }
+            }
+
+            "getglobalvar" -> {
+                hasCompatibleCommand = true
+                pipe = state.getGlobal(resolveVariableName(arguments, args))
+            }
+
+            "setglobalvar" -> {
+                hasCompatibleCommand = true
+                val (name, value) = resolveVariableNameAndValue(arguments, args, pipe)
+                if (name.isNotBlank()) {
+                    pipe = state.setGlobal(name, value)
+                }
+            }
+
+            "addglobalvar" -> {
+                hasCompatibleCommand = true
+                val (name, increment) = resolveVariableNameAndValue(arguments, args, pipe)
+                if (name.isNotBlank()) {
+                    pipe = state.addGlobal(name, increment)
+                }
+            }
+
+            "incglobalvar" -> {
+                hasCompatibleCommand = true
+                val name = resolveVariableName(arguments, args)
+                if (name.isNotBlank()) {
+                    pipe = state.addGlobal(name, "1")
+                }
+            }
+
+            "decglobalvar" -> {
+                hasCompatibleCommand = true
+                val name = resolveVariableName(arguments, args)
+                if (name.isNotBlank()) {
+                    pipe = state.addGlobal(name, "-1")
+                }
+            }
+
+            "flushglobalvar" -> {
+                hasCompatibleCommand = true
+                val name = resolveVariableName(arguments, args)
+                if (name.isNotBlank()) {
+                    state.flushGlobal(name)
+                    pipe = ""
+                }
             }
 
             "sys" -> {
@@ -190,8 +303,182 @@ private fun executeQuickMessageSlashCommands(input: String, currentInput: String
         unsupportedCommands = unsupported,
         toastMessages = toastMessages,
         chatMessages = chatMessages,
+        localVariables = state.localVariables(),
+        globalVariables = state.globalVariables(),
+        variablesUpdated = state.variablesUpdated(),
     )
 }
+
+private class QuickMessageVariableState(
+    localVariables: Map<String, String>,
+    globalVariables: Map<String, String>,
+) {
+    private val initialLocalVariables = localVariables.normalizedVariableMap()
+    private val initialGlobalVariables = globalVariables.normalizedVariableMap()
+    private val local = initialLocalVariables.toMutableMap()
+    private val global = initialGlobalVariables.toMutableMap()
+
+    fun localVariables(): Map<String, String> = local.toMap()
+
+    fun globalVariables(): Map<String, String> = global.toMap()
+
+    fun variablesUpdated(): Boolean =
+        local != initialLocalVariables || global != initialGlobalVariables
+
+    fun getLocalOrGlobal(name: String): String =
+        local[normalizeVariableName(name)] ?: getGlobal(name)
+
+    fun getGlobal(name: String): String =
+        global[normalizeVariableName(name)].orEmpty()
+
+    fun setLocal(name: String, value: String): String =
+        set(local, name, value)
+
+    fun setGlobal(name: String, value: String): String =
+        set(global, name, value)
+
+    fun addLocal(name: String, increment: String): String =
+        add(local, name, increment)
+
+    fun addGlobal(name: String, increment: String): String =
+        add(global, name, increment)
+
+    fun flushLocal(name: String) {
+        local.remove(normalizeVariableName(name))
+    }
+
+    fun flushGlobal(name: String) {
+        global.remove(normalizeVariableName(name))
+    }
+
+    fun expandMacros(value: String, pipe: String): String =
+        value.replacePipeMacro(pipe).replace(variableMacroRegex) { match ->
+            val macro = match.groupValues[1].lowercase()
+            val parts = match.groupValues[2].split("::", limit = 2)
+            val name = parts.getOrNull(0).orEmpty()
+            val argument = parts.getOrNull(1).orEmpty()
+            when (macro) {
+                "var", "getvar" -> getLocalOrGlobal(name)
+                "getglobalvar" -> getGlobal(name)
+                "incvar" -> addLocal(name, "1")
+                "decvar" -> addLocal(name, "-1")
+                "incglobalvar" -> addGlobal(name, "1")
+                "decglobalvar" -> addGlobal(name, "-1")
+                "setvar" -> {
+                    setLocal(name, argument)
+                    ""
+                }
+                "setglobalvar" -> {
+                    setGlobal(name, argument)
+                    ""
+                }
+                "addvar" -> {
+                    addLocal(name, argument)
+                    ""
+                }
+                "addglobalvar" -> {
+                    addGlobal(name, argument)
+                    ""
+                }
+                else -> match.value
+            }
+        }
+
+    private fun set(target: MutableMap<String, String>, name: String, value: String): String {
+        val key = normalizeVariableName(name)
+        if (key.isBlank()) return ""
+        target[key] = value
+        return value
+    }
+
+    private fun add(target: MutableMap<String, String>, name: String, increment: String): String {
+        val key = normalizeVariableName(name)
+        if (key.isBlank()) return ""
+        val current = target[key].orEmpty()
+        val next = addVariableValues(current, increment)
+        target[key] = next
+        return next
+    }
+}
+
+private fun Map<String, String>.normalizedVariableMap(): Map<String, String> =
+    entries
+        .mapNotNull { (key, value) ->
+            normalizeVariableName(key).takeIf { it.isNotBlank() }?.let { it to value }
+        }
+        .toMap()
+
+private fun normalizeVariableName(name: String): String =
+    name.trim()
+
+private fun resolveVariableName(arguments: SlashArguments, args: String): String =
+    arguments.named["key"]
+        ?: arguments.named["name"]
+        ?: splitFirstSlashArgument(args).first
+
+private fun resolveVariableNameAndValue(
+    arguments: SlashArguments,
+    args: String,
+    pipe: String,
+): Pair<String, String> {
+    val namedKey = arguments.named["key"] ?: arguments.named["name"]
+    val namedValue = arguments.named["value"] ?: arguments.named["increment"]
+    if (namedKey != null) {
+        return namedKey to (namedValue ?: resolveSlashArgument(args, pipe))
+    }
+
+    val (name, rest) = splitFirstSlashArgument(args)
+    return name to (namedValue ?: resolveSlashArgument(rest, pipe))
+}
+
+private fun splitFirstSlashArgument(value: String): Pair<String, String> {
+    val trimmed = value.trimStart()
+    if (trimmed.isBlank()) return "" to ""
+
+    val first = StringBuilder()
+    var quote: Char? = null
+    var escaped = false
+    var index = 0
+
+    while (index < trimmed.length) {
+        val char = trimmed[index]
+        when {
+            escaped -> {
+                first.append(char)
+                escaped = false
+            }
+            char == '\\' -> escaped = true
+            quote != null -> {
+                if (char == quote) {
+                    quote = null
+                } else {
+                    first.append(char)
+                }
+            }
+            char == '"' || char == '\'' -> quote = char
+            char.isWhitespace() -> {
+                return first.toString() to trimmed.substring(index + 1).trimStart()
+            }
+            else -> first.append(char)
+        }
+        index++
+    }
+
+    return first.toString() to ""
+}
+
+private fun addVariableValues(current: String, increment: String): String {
+    val left = current.ifBlank { "0" }.toBigDecimalOrNull()
+    val right = increment.ifBlank { "0" }.toBigDecimalOrNull()
+    return if (left != null && right != null) {
+        (left + right).stripTrailingZeros().toPlainString().let { if (it == "-0") "0" else it }
+    } else {
+        current + increment
+    }
+}
+
+private fun String.toBigDecimalOrNull(): BigDecimal? =
+    runCatching { BigDecimal(trim()) }.getOrNull()
 
 private data class ParsedSlashCommand(
     val name: String,
@@ -280,7 +567,11 @@ private data class SlashArguments(
     val unnamed: String,
 )
 
-private fun parseSlashArguments(args: String, pipe: String): SlashArguments {
+private fun parseSlashArguments(
+    args: String,
+    pipe: String,
+    state: QuickMessageVariableState,
+): SlashArguments {
     var remaining = args.trimStart()
     val named = mutableMapOf<String, String>()
 
@@ -292,14 +583,14 @@ private fun parseSlashArguments(args: String, pipe: String): SlashArguments {
             .firstOrNull { it.isNotEmpty() }
             .orEmpty()
             .unescapeSlashArgument()
-            .replacePipeMacro(pipe)
+            .let { state.expandMacros(it, pipe) }
         named[key] = value
         remaining = remaining.substring(match.range.last + 1).trimStart()
     }
 
     return SlashArguments(
         named = named,
-        unnamed = remaining.replacePipeMacro(pipe).trim(),
+        unnamed = state.expandMacros(remaining, pipe).trim(),
     )
 }
 
@@ -314,6 +605,9 @@ private fun stripLeadingNamedArguments(args: String): String {
 
 private val leadingNamedArgumentRegex =
     Regex("""^([A-Za-z_][A-Za-z0-9_-]*)=(?:"((?:\\.|[^"])*)"|'((?:\\.|[^'])*)'|(\S+))\s*""")
+
+private val variableMacroRegex =
+    Regex("""\{\{(var|getvar|getglobalvar|setvar|setglobalvar|addvar|addglobalvar|incvar|decvar|incglobalvar|decglobalvar)::([^}]*)}}""")
 
 private fun String.replacePipeMacro(pipe: String): String =
     replace("{{pipe}}", pipe)

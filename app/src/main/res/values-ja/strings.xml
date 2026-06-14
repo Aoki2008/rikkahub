@@ -5,7 +5,7 @@
   <string name="about_page_system">システム</string>
   <string name="about_page_title">アプリについて</string>
   <string name="about_page_version">バージョン</string>
-  <string name="about_page_website">ウェブサイト</string>
+  <string name="about_page_website">プロジェクト</string>
   <string name="add">追加</string>
   <string name="app_name">RikkaHub ST</string>
   <string name="asr_button_content_description">音声認識</string>
@@ -755,7 +755,7 @@
   <string name="setting_model_page_translate_model_desc">翻訳機能に使用されるモデル</string>
   <string name="setting_model_page_translate_prompt_vars">変数: 原文テキスト: {source_text}, 対象言語: {target_lang}</string>
   <string name="setting_page_about">アプリについて</string>
-  <string name="setting_page_about_desc">このアプリについて</string>
+  <string name="setting_page_about_desc">バージョン、リンク、ビルド情報</string>
   <string name="setting_page_assistant">アシスタント</string>
   <string name="setting_page_assistant_desc">カスタムアシスタント（エージェント）を設定</string>
   <string name="setting_page_built_in_tools">組み込みツール</string>
@@ -783,14 +783,14 @@
   <string name="setting_page_default_model_desc">各機能のデフォルトモデルを設定</string>
   <string name="setting_page_display_setting">表示設定</string>
   <string name="setting_page_display_setting_desc">表示設定を管理</string>
-  <string name="setting_page_documentation">ドキュメント</string>
-  <string name="setting_page_documentation_desc">アプリの使用方法とヘルプドキュメントを表示</string>
+  <string name="setting_page_documentation">Project README</string>
+  <string name="setting_page_documentation_desc">SillyTavern-parity README とリリース情報を開く</string>
   <string name="setting_page_donate">寄付</string>
   <string name="setting_page_donate_desc">このアプリを気に入った場合は、作者の作品をスポンサーしてください</string>
   <string name="setting_page_dynamic_color">ダイナミックカラー</string>
   <string name="setting_page_dynamic_color_desc">壁紙に基づいてアプリのテーマ配色を動的に生成するかどうか</string>
   <string name="setting_page_extensions">拡張機能</string>
-  <string name="setting_page_extensions_desc">プロンプトインジェクション、スキルなどを管理</string>
+  <string name="setting_page_extensions_desc">SillyTavern リソース、プロンプト注入、クイック返信、スキルを管理</string>
   <string name="setting_page_general_settings">一般設定</string>
   <string name="setting_page_interaction_notification_settings">インタラクションと通知</string>
   <string name="setting_page_mcp">MCP</string>
@@ -815,7 +815,7 @@
   <string name="setting_page_search_title">検索サービス</string>
   <string name="setting_page_share">共有</string>
   <string name="setting_page_share_desc">このアプリを友達と共有</string>
-  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nGitHub: https://github.com/Aoki2008/rikkahub</string>
+  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nProject: https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity</string>
   <string name="setting_page_sponsor_alert_confirm">寄付</string>
   <string name="setting_page_sponsor_alert_desc">アプリを100回以上起動しました！気に入っていただけたら、開発者をサポートしていただけると嬉しいです。</string>
   <string name="setting_page_sponsor_alert_dismiss">今はしない</string>

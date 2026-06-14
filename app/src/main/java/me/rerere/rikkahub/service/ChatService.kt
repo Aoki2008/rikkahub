@@ -165,7 +165,7 @@ class ChatService(
     private val templateTransformer: TemplateTransformer,
     private val providerManager: ProviderManager,
     private val localTools: LocalTools,
-    val mcpManager: McpManager,
+    val mcpManager: McpManager?,
     private val filesManager: FilesManager,
     private val skillManager: SkillManager,
 ) {
@@ -410,8 +410,9 @@ class ChatService(
         conversationId: Uuid,
         messages: List<QuickMessageChatMessage>,
         triggerGeneration: Boolean,
+        localVariables: Map<String, String>? = null,
     ) {
-        if (messages.isEmpty() && !triggerGeneration) return
+        if (messages.isEmpty() && !triggerGeneration && localVariables == null) return
 
         val session = getOrCreateSession(conversationId)
         val previousJob = session.getJob()
@@ -429,11 +430,16 @@ class ChatService(
                 }
 
                 if (nodes.isNotEmpty()) {
+                    saveConversation(conversationId,
+                        currentConversation.withQuickMessageUpdates(
+                            nodes = nodes,
+                            localVariables = localVariables,
+                        ),
+                    )
+                } else if (localVariables != null) {
                     saveConversation(
                         conversationId,
-                        currentConversation.copy(
-                            messageNodes = currentConversation.messageNodes + nodes,
-                        )
+                        currentConversation.copy(scriptVariables = localVariables),
                     )
                 }
 
@@ -449,6 +455,14 @@ class ChatService(
         }
         session.setJob(job)
     }
+
+    private fun Conversation.withQuickMessageUpdates(
+        nodes: List<MessageNode>,
+        localVariables: Map<String, String>?,
+    ): Conversation = copy(
+        messageNodes = messageNodes + nodes,
+        scriptVariables = localVariables ?: scriptVariables,
+    )
 
     private fun QuickMessageChatMessage.toMessageNode(
         settings: Settings,
@@ -712,7 +726,7 @@ class ChatService(
 
             // memory tool
             if (!model.abilities.contains(ModelAbility.TOOL)) {
-                if (settings.enableWebSearch || (AppFeatures.MCP && mcpManager.getAllAvailableTools().isNotEmpty())) {
+                if (settings.enableWebSearch || (AppFeatures.MCP && mcpManager?.getAllAvailableTools().orEmpty().isNotEmpty())) {
                     addError(
                         IllegalStateException(context.getString(R.string.tools_warning)),
                         conversationId,
@@ -724,6 +738,7 @@ class ChatService(
             // check invalid messages
             checkInvalidMessages(conversationId)
             val conversation = getConversationFlow(conversationId).value
+            var lastStreamMessages: List<UIMessage>? = null
 
             // start generating
             val session = getOrCreateSession(conversationId)
@@ -768,7 +783,7 @@ class ChatService(
                         )
                     }
                     if (AppFeatures.MCP) {
-                        mcpManager.getAllAvailableTools().forEach { (serverId, tool) ->
+                        mcpManager?.getAllAvailableTools().orEmpty().forEach { (serverId, tool) ->
                             add(
                                 Tool(
                                     name = "mcp__" + tool.name,
@@ -803,8 +818,9 @@ class ChatService(
             }.collect { chunk ->
                 when (chunk) {
                     is GenerationChunk.Messages -> {
-                        val currentConversation = getConversationFlow(conversationId).value
-                        if (currentConversation.currentMessages != chunk.messages) {
+                        if (lastStreamMessages != chunk.messages) {
+                            lastStreamMessages = chunk.messages
+                            val currentConversation = getConversationFlow(conversationId).value
                             val updatedConversation = currentConversation.updateCurrentMessages(chunk.messages)
                             updateConversation(conversationId, updatedConversation)
                         }

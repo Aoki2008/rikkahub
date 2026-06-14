@@ -28,6 +28,8 @@ data class ConversationEntity(
     val modeInjectionIds: String = "[]",
     @ColumnInfo("lorebook_ids", defaultValue = "[]")
     val lorebookIds: String = "[]",
+    @ColumnInfo("script_variables", defaultValue = "{}")
+    val scriptVariables: String = "{}",
     @ColumnInfo("group_id", defaultValue = "")
     val groupId: String = "",
 )

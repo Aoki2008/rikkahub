@@ -2,8 +2,17 @@ package me.rerere.rikkahub.utils
 
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import me.rerere.rikkahub.AppLinks
 
 class UpdateCheckerTest {
+    @Test
+    fun `release api points at the SillyTavern parity fork releases`() {
+        assertEquals(
+            "https://api.github.com/repos/Aoki2008/rikkahub/releases/latest",
+            AppLinks.RELEASES_API_URL,
+        )
+    }
+
     @Test
     fun `github latest release maps apk assets by device abi priority`() {
         val info = parseGitHubReleaseUpdateInfo(

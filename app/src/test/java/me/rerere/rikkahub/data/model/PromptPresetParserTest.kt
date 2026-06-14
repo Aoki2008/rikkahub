@@ -61,6 +61,28 @@ class PromptPresetParserTest {
     }
 
     @Test
+    fun `parses sampler-only preset aliases`() {
+        val raw = """
+            {
+              "name": "Neutral",
+              "temperature": 0.65,
+              "top_p": 0.9,
+              "max_context": 8192,
+              "max_length": 400
+            }
+        """.trimIndent()
+
+        val p = parseSillyTavernPreset(Json.parseToJsonElement(raw).jsonObject, "Neutral")
+
+        assertEquals("Neutral", p.name)
+        assertEquals(0.65f, p.temperature)
+        assertEquals(0.9f, p.topP)
+        assertEquals(8192, p.maxContext)
+        assertEquals(400, p.maxTokens)
+        assertTrue(p.prompts.isEmpty())
+    }
+
+    @Test
     fun `parses prompt blocks with markers`() {
         val p = parse()
         assertEquals(5, p.prompts.size)

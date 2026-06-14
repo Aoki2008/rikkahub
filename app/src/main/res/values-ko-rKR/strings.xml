@@ -5,7 +5,7 @@
   <string name="about_page_system">시스템</string>
   <string name="about_page_title">정보</string>
   <string name="about_page_version">버전</string>
-  <string name="about_page_website">웹사이트</string>
+  <string name="about_page_website">프로젝트</string>
   <string name="add">추가</string>
   <string name="app_name">RikkaHub ST</string>
   <string name="asr_button_content_description">음성 인식</string>
@@ -755,7 +755,7 @@
   <string name="setting_model_page_translate_model_desc">번역 기능에 사용되는 모델</string>
   <string name="setting_model_page_translate_prompt_vars">변수: 원문: {source_text}, 대상 언어: {target_lang}</string>
   <string name="setting_page_about">정보</string>
-  <string name="setting_page_about_desc">앱 정보</string>
+  <string name="setting_page_about_desc">버전, 링크 및 빌드 정보</string>
   <string name="setting_page_assistant">어시스턴트</string>
   <string name="setting_page_assistant_desc">개인화된 어시스턴트(에이전트) 설정</string>
   <string name="setting_page_built_in_tools">내장 도구</string>
@@ -783,14 +783,14 @@
   <string name="setting_page_default_model_desc">각 기능의 기본 모델 설정</string>
   <string name="setting_page_display_setting">디스플레이 설정</string>
   <string name="setting_page_display_setting_desc">디스플레이 설정 관리</string>
-  <string name="setting_page_documentation">문서</string>
-  <string name="setting_page_documentation_desc">앱 사용법 및 도움말 문서 보기</string>
+  <string name="setting_page_documentation">Project README</string>
+  <string name="setting_page_documentation_desc">SillyTavern-parity README 및 릴리스 정보를 엽니다</string>
   <string name="setting_page_donate">후원</string>
   <string name="setting_page_donate_desc">앱이 마음에 드시면 제작자의 작업을 후원해 주세요</string>
   <string name="setting_page_dynamic_color">동적 색상</string>
   <string name="setting_page_dynamic_color_desc">배경화면을 기반으로 앱 테마 색상을 동적으로 생성할지 여부</string>
   <string name="setting_page_extensions">확장 기능</string>
-  <string name="setting_page_extensions_desc">프롬프트 인젝션, 스킬 등을 관리합니다</string>
+  <string name="setting_page_extensions_desc">SillyTavern 리소스, 프롬프트 주입, 빠른 답장 및 스킬을 관리합니다</string>
   <string name="setting_page_general_settings">일반 설정</string>
   <string name="setting_page_interaction_notification_settings">상호작용 &amp;amp; 알림</string>
   <string name="setting_page_mcp">MCP</string>
@@ -815,7 +815,7 @@
   <string name="setting_page_search_title">검색 서비스</string>
   <string name="setting_page_share">공유</string>
   <string name="setting_page_share_desc">앱을 친구들과 공유하기</string>
-  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nGitHub: https://github.com/Aoki2008/rikkahub</string>
+  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nProject: https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity</string>
   <string name="setting_page_sponsor_alert_confirm">기부하기</string>
   <string name="setting_page_sponsor_alert_desc">앱을 100번 이상 실행하셨네요! 만족스럽게 사용하고 계시다면 개발자를 후원해 주세요.</string>
   <string name="setting_page_sponsor_alert_dismiss">나중에</string>

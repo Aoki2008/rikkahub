@@ -356,8 +356,10 @@ class RouteActivity : ComponentActivity() {
                                 AssistantRequestPage(key.id)
                             }
 
-                            entry<Screen.AssistantMcp> { key ->
-                                AssistantMcpPage(key.id)
+                            if (AppFeatures.MCP) {
+                                entry<Screen.AssistantMcp> { key ->
+                                    AssistantMcpPage(key.id)
+                                }
                             }
 
                             entry<Screen.AssistantLocalTool> { key ->
@@ -442,8 +444,10 @@ class RouteActivity : ComponentActivity() {
                                 SettingSpeechPage()
                             }
 
-                            entry<Screen.SettingMcp> {
-                                SettingMcpPage()
+                            if (AppFeatures.MCP) {
+                                entry<Screen.SettingMcp> {
+                                    SettingMcpPage()
+                                }
                             }
 
                             entry<Screen.SettingDonate> {

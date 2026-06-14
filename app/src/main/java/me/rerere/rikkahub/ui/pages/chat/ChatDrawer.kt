@@ -91,6 +91,7 @@ fun ChatDrawerContent(
     vm: ChatVM,
     settings: Settings,
     current: Conversation,
+    showUpdateCard: Boolean,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -147,7 +148,7 @@ fun ChatDrawerContent(
             modifier = Modifier.padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            if (settings.displaySetting.showUpdates && !isPlayStore) {
+            if (showUpdateCard && settings.displaySetting.showUpdates && !isPlayStore) {
                 UpdateCard(vm)
             }
 

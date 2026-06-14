@@ -71,7 +71,7 @@ internal fun FilesPicker(
     conversation: Conversation,
     assistant: Assistant,
     state: ChatInputState,
-    mcpManager: McpManager,
+    mcpManager: McpManager?,
     onCompressContext: (additionalPrompt: String, targetTokens: Int, keepRecentMessages: Int) -> Job,
     onUpdateAssistant: (Assistant) -> Unit,
     onUpdateConversation: (Conversation) -> Unit,
@@ -116,11 +116,12 @@ internal fun FilesPicker(
             modifier = Modifier.fillMaxWidth()
         )
 
-        if (AppFeatures.MCP && settings.mcpServers.isNotEmpty()) {
+        val activeMcpManager = mcpManager
+        if (AppFeatures.MCP && settings.mcpServers.isNotEmpty() && activeMcpManager != null) {
             McpPickerListItem(
                 assistant = assistant,
                 servers = settings.mcpServers,
-                mcpManager = mcpManager,
+                mcpManager = activeMcpManager,
                 onUpdateAssistant = onUpdateAssistant,
             )
         }

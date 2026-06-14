@@ -52,6 +52,7 @@ import me.rerere.hugeicons.stroke.Cancel01
 import me.rerere.hugeicons.stroke.LeftToRightListBullet
 import me.rerere.hugeicons.stroke.Menu03
 import me.rerere.hugeicons.stroke.MessageAdd01
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.rikkahub.R
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.datastore.findProvider
@@ -167,7 +168,8 @@ fun ChatPage(id: Uuid, text: String?, files: List<Uri>, nodeId: Uuid? = null) {
                         navController = navController,
                         current = conversation,
                         vm = vm,
-                        settings = setting
+                        settings = setting,
+                        showUpdateCard = true,
                     )
                 }
             ) {
@@ -199,7 +201,8 @@ fun ChatPage(id: Uuid, text: String?, files: List<Uri>, nodeId: Uuid? = null) {
                         navController = navController,
                         current = conversation,
                         vm = vm,
-                        settings = setting
+                        settings = setting,
+                        showUpdateCard = drawerState.isOpen,
                     )
                 }
             ) {
@@ -283,7 +286,7 @@ private fun ChatPageContent(
                     loading = loadingJob != null,
                     settings = setting,
                     conversation = conversation,
-                    mcpManager = vm.mcpManager,
+                    mcpManager = if (AppFeatures.MCP) vm.mcpManager else null,
                     hazeState = hazeState,
                     onCancelClick = {
                         vm.stopGeneration()
@@ -324,11 +327,20 @@ private fun ChatPageContent(
                         }
                         inputState.clearInput()
                     },
-                    onApplyQuickMessageChatMessages = { messages, triggerGeneration ->
+                    onApplyQuickMessageVariables = { localVariables, globalVariables ->
+                        if (conversation.scriptVariables != localVariables) {
+                            vm.updateConversation(conversation.copy(scriptVariables = localVariables))
+                            vm.saveConversationAsync()
+                        }
+                        if (setting.scriptVariables != globalVariables) {
+                            vm.updateSettings(setting.copy(scriptVariables = globalVariables))
+                        }
+                    },
+                    onApplyQuickMessageChatMessages = { messages, triggerGeneration, localVariables ->
                         if (triggerGeneration && currentChatModel == null) {
                             toaster.show("请先选择模型", type = ToastType.Error)
                         } else {
-                            vm.applyQuickMessageChatMessages(messages, triggerGeneration)
+                            vm.applyQuickMessageChatMessages(messages, triggerGeneration, localVariables)
                             scope.launch {
                                 chatListState.requestScrollToItem(conversation.messageNodes.size + messages.size + 5)
                             }

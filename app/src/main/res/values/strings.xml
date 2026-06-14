@@ -5,7 +5,7 @@
   <string name="about_page_system">System</string>
   <string name="about_page_title">About</string>
   <string name="about_page_version">Version</string>
-  <string name="about_page_website">Website</string>
+  <string name="about_page_website">Project</string>
   <string name="add">Add</string>
   <string name="app_name">RikkaHub ST</string>
   <string name="asr_button_content_description">Speech Recognition</string>
@@ -772,7 +772,7 @@
   <string name="setting_model_page_translate_model_desc">The model used for translation features</string>
   <string name="setting_model_page_translate_prompt_vars">Variables: Source text: {source_text}, Target language: {target_lang}</string>
   <string name="setting_page_about">About</string>
-  <string name="setting_page_about_desc">About this app</string>
+  <string name="setting_page_about_desc">Version, links, and build info</string>
   <string name="setting_page_assistant">Assistant</string>
   <string name="setting_page_assistant_desc">Set up personalized assistants (agents)</string>
   <string name="setting_page_built_in_tools">Built-in Tools</string>
@@ -810,14 +810,14 @@
   <string name="setting_page_preferences_general_desc">Interaction behavior, scrolling, input settings</string>
   <string name="setting_page_preferences_ui">UI Preferences</string>
   <string name="setting_page_preferences_ui_desc">Message display, fonts, code blocks</string>
-  <string name="setting_page_documentation">Documentation</string>
-  <string name="setting_page_documentation_desc">View app usage instructions and help documentation</string>
+  <string name="setting_page_documentation">Project README</string>
+  <string name="setting_page_documentation_desc">Open the SillyTavern-parity README and release notes</string>
   <string name="setting_page_donate">Donate</string>
   <string name="setting_page_donate_desc">If you like it, sponsor the author\'s work</string>
   <string name="setting_page_dynamic_color">Dynamic Color</string>
   <string name="setting_page_dynamic_color_desc">Generate the app theme colors dynamically from your wallpaper</string>
   <string name="setting_page_extensions">Extensions</string>
-  <string name="setting_page_extensions_desc">Manage prompt injections, skills and more</string>
+  <string name="setting_page_extensions_desc">Manage SillyTavern resources, prompt injections, quick replies, and skills</string>
   <string name="setting_page_general_settings">General Settings</string>
   <string name="setting_page_interaction_notification_settings">Interaction &amp;amp; Notifications</string>
   <string name="setting_page_mcp">MCP</string>
@@ -842,7 +842,7 @@
   <string name="setting_page_search_title">Search Service</string>
   <string name="setting_page_share">Share</string>
   <string name="setting_page_share_desc">Share this app with friends</string>
-  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nGitHub: https://github.com/Aoki2008/rikkahub</string>
+  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nProject: https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity</string>
   <string name="setting_page_sponsor_alert_confirm">Donate</string>
   <string name="setting_page_sponsor_alert_desc">You have launched the app over 100 times! If you enjoy using it, please consider supporting the developer.</string>
   <string name="setting_page_sponsor_alert_dismiss">Not Now</string>

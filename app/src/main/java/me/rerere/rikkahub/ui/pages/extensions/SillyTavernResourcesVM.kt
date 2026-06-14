@@ -6,8 +6,6 @@ import android.util.Base64
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.core.net.toUri
-import java.net.HttpURLConnection
-import java.net.URL
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +18,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.data.datastore.SettingsStore
 import me.rerere.rikkahub.data.files.FilesManager
 import me.rerere.rikkahub.data.files.saveUploadFromBytes
@@ -31,6 +30,8 @@ import me.rerere.rikkahub.ui.pages.assistant.detail.ParsedCard
 import me.rerere.rikkahub.ui.pages.assistant.detail.parseTavernCard
 import me.rerere.rikkahub.utils.ImageUtils
 import me.rerere.rikkahub.utils.PngTextChunk
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 private const val SILLY_TAVERN_OFFICIAL_INDEX =
     "https://raw.githubusercontent.com/SillyTavern/SillyTavern/release/default/content/index.json"
@@ -65,6 +66,7 @@ data class SillyTavernImportReport(
 class SillyTavernResourcesVM(
     private val settingsStore: SettingsStore,
     private val filesManager: FilesManager,
+    private val httpClient: OkHttpClient,
 ) : ViewModel() {
     private val json = Json { ignoreUnknownKeys = true }
 
@@ -281,18 +283,17 @@ class SillyTavernResourcesVM(
         downloadBytes(url).toString(Charsets.UTF_8)
 
     private fun downloadBytes(url: String): ByteArray {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 10_000
-        connection.readTimeout = 30_000
-        connection.setRequestProperty("Accept", "application/vnd.github+json, text/plain, */*")
-        return try {
-            if (connection.responseCode in 200..299) {
-                connection.inputStream.use { it.readBytes() }
-            } else {
-                error("HTTP ${connection.responseCode}")
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .header("Accept", "application/vnd.github+json, text/plain, */*")
+            .header("User-Agent", "RikkaHub-ST/${BuildConfig.VERSION_NAME}")
+            .build()
+        httpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                error("HTTP ${response.code}")
             }
-        } finally {
-            connection.disconnect()
+            return response.body.bytes()
         }
     }
 }

@@ -5,7 +5,7 @@
   <string name="about_page_system">Система</string>
   <string name="about_page_title">О приложении</string>
   <string name="about_page_version">Версия</string>
-  <string name="about_page_website">Веб-сайт</string>
+  <string name="about_page_website">Проект</string>
   <string name="add">Добавить</string>
   <string name="app_name">RikkaHub ST</string>
   <string name="asr_button_content_description">Распознавание речи</string>
@@ -755,7 +755,7 @@
   <string name="setting_model_page_translate_model_desc">Модель, используемая для функций перевода</string>
   <string name="setting_model_page_translate_prompt_vars">Переменные: Исходный текст: {source_text}, Целевой язык: {target_lang}</string>
   <string name="setting_page_about">О приложении</string>
-  <string name="setting_page_about_desc">Об этом приложении</string>
+  <string name="setting_page_about_desc">Версия, ссылки и сведения о сборке</string>
   <string name="setting_page_assistant">Ассистент</string>
   <string name="setting_page_assistant_desc">Настроить персонализированных ассистентов (агентов)</string>
   <string name="setting_page_built_in_tools">Встроенные инструменты</string>
@@ -783,14 +783,14 @@
   <string name="setting_page_default_model_desc">Установить модели по умолчанию для каждой функции</string>
   <string name="setting_page_display_setting">Настройки отображения</string>
   <string name="setting_page_display_setting_desc">Управление настройками отображения</string>
-  <string name="setting_page_documentation">Документация</string>
-  <string name="setting_page_documentation_desc">Просмотрите инструкции по использованию приложения и справочную документацию</string>
+  <string name="setting_page_documentation">Project README</string>
+  <string name="setting_page_documentation_desc">Открыть README ветки SillyTavern-parity и информацию о релизах</string>
   <string name="setting_page_donate">Поддержать</string>
   <string name="setting_page_donate_desc">Если вам нравится, поддержите автора</string>
   <string name="setting_page_dynamic_color">Динамический цвет</string>
   <string name="setting_page_dynamic_color_desc">Динамически создавать цвета темы приложения на основе обоев</string>
   <string name="setting_page_extensions">Расширения</string>
-  <string name="setting_page_extensions_desc">Управление внедрением подсказок, навыками и другими возможностями</string>
+  <string name="setting_page_extensions_desc">Управление ресурсами SillyTavern, вставками подсказок, быстрыми ответами и навыками</string>
   <string name="setting_page_general_settings">Общие настройки</string>
   <string name="setting_page_interaction_notification_settings">Взаимодействие и уведомления</string>
   <string name="setting_page_mcp">MCP</string>
@@ -815,7 +815,7 @@
   <string name="setting_page_search_title">Служба поиска</string>
   <string name="setting_page_share">Поделиться</string>
   <string name="setting_page_share_desc">Поделиться этим приложением с друзьями</string>
-  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nGitHub: https://github.com/Aoki2008/rikkahub</string>
+  <string name="setting_page_share_text">RikkaHub ST - Android SillyTavern-compatible client\n\nProject: https://github.com/Aoki2008/rikkahub/tree/feat/sillytavern-parity</string>
   <string name="setting_page_sponsor_alert_confirm">Пожертвовать</string>
   <string name="setting_page_sponsor_alert_desc">Вы запустили приложение более 100 раз! Если вам нравится им пользоваться, пожалуйста, поддержите разработчика.</string>
   <string name="setting_page_sponsor_alert_dismiss">Не сейчас</string>

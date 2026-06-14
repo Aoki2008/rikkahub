@@ -27,6 +27,7 @@ data class Conversation(
     val customSystemPrompt: String? = null,
     val modeInjectionIds: Set<Uuid> = emptySet(),
     val lorebookIds: Set<Uuid> = emptySet(),
+    val scriptVariables: Map<String, String> = emptyMap(),
     // 非空时表示这是一个群聊(多角色)对话，引用 Settings.chatGroups 中的某个 ChatGroup。
     // 此时每轮回复由群聊激活策略选择成员发言，assistantId 取首位成员(供既有单人路径回退使用)。
     val groupId: Uuid? = null,

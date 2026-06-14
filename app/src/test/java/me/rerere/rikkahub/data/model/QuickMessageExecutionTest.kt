@@ -255,4 +255,95 @@ class QuickMessageExecutionTest {
         assertEquals(false, plan.inputUpdated)
         assertEquals(QuickMessageSendMode.NORMAL, plan.sendMode)
     }
+
+    @Test
+    fun `setvar and getvar persist local variable state through pipe and macros`() {
+        val quickMessage = QuickMessage(
+            title = "Save request",
+            content = "/pass sealed gate | /setvar key=topic | /echo Topic is {{getvar::topic}} | /getvar topic | /setinput Ask about {{pipe}}.",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals("Ask about sealed gate.", plan.inputText)
+        assertEquals(mapOf("topic" to "sealed gate"), plan.localVariables)
+        assertEquals(true, plan.variablesUpdated)
+        assertEquals(listOf("Topic is sealed gate"), plan.toastMessages)
+    }
+
+    @Test
+    fun `addvar incvar and decvar update numeric local variables`() {
+        val quickMessage = QuickMessage(
+            title = "Counter",
+            content = "/setvar key=count 2 | /addvar key=count 3 | /incvar count | /decvar count | /echo {{getvar::count}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("count" to "5"), plan.localVariables)
+        assertEquals(listOf("5"), plan.toastMessages)
+    }
+
+    @Test
+    fun `local variable lookup takes priority over global variable lookup`() {
+        val quickMessage = QuickMessage(
+            title = "Scope",
+            content = "/getvar mood | /echo {{pipe}} and {{getglobalvar::mood}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+            localVariables = mapOf("mood" to "local"),
+            globalVariables = mapOf("mood" to "global"),
+        )
+
+        assertEquals(listOf("local and global"), plan.toastMessages)
+    }
+
+    @Test
+    fun `global variable commands update global state`() {
+        val quickMessage = QuickMessage(
+            title = "Global flag",
+            content = "/setglobalvar key=route north | /getglobalvar route | /echo {{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+        )
+
+        assertEquals(mapOf("route" to "north"), plan.globalVariables)
+        assertEquals(true, plan.variablesUpdated)
+        assertEquals(listOf("north"), plan.toastMessages)
+    }
+
+    @Test
+    fun `flush variable removes local value`() {
+        val quickMessage = QuickMessage(
+            title = "Flush",
+            content = "/flushvar route | /echo {{getvar::route}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "",
+            localVariables = mapOf("route" to "north"),
+        )
+
+        assertEquals(emptyMap<String, String>(), plan.localVariables)
+        assertEquals(true, plan.variablesUpdated)
+        assertEquals(emptyList<String>(), plan.toastMessages)
+    }
 }

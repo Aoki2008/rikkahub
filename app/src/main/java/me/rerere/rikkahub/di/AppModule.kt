@@ -5,8 +5,10 @@ import com.google.firebase.analytics.analytics
 import com.google.firebase.crashlytics.crashlytics
 import com.google.firebase.remoteconfig.remoteConfig
 import kotlinx.serialization.json.Json
+import me.rerere.rikkahub.AppFeatures
 import me.rerere.highlight.Highlighter
 import me.rerere.rikkahub.AppScope
+import me.rerere.rikkahub.data.ai.mcp.McpManager
 import me.rerere.rikkahub.data.ai.AILoggingManager
 import me.rerere.rikkahub.data.ai.tools.LocalTools
 import me.rerere.rikkahub.data.event.AppEventBus
@@ -82,7 +84,7 @@ val appModule = module {
             templateTransformer = get(),
             providerManager = get(),
             localTools = get(),
-            mcpManager = get(),
+            mcpManager = if (AppFeatures.MCP) get<McpManager>() else null,
             filesManager = get(),
             skillManager = get()
         )

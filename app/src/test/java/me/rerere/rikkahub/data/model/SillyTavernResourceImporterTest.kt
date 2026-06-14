@@ -60,21 +60,32 @@ class SillyTavernResourceImporterTest {
                     "placement": [2]
                   }
                 ]
+              },
+              {
+                "name": "Sampler only",
+                "temperature": 0.7,
+                "top_p": 0.85,
+                "max_length": 512
               }
             ]
             """.trimIndent(),
             fallbackName = "bundle",
         )
 
-        assertEquals(1, result.promptPresets.size)
+        assertEquals(2, result.promptPresets.size)
         assertEquals(1, result.contextPresets.size)
         assertEquals(1, result.instructPresets.size)
         assertEquals(1, result.systemPromptPresets.size)
         assertEquals(1, result.lorebooks.size)
         assertEquals(1, result.quickMessages.size)
         assertEquals(1, result.regexes.size)
-        assertEquals(6, result.globalResourceCount)
-        assertEquals(7, result.detectedResourceCount)
+        assertEquals(7, result.globalResourceCount)
+        assertEquals(8, result.detectedResourceCount)
+        val sampler = result.promptPresets.single { it.name == "Sampler only" }
+        assertEquals(0.7f, sampler.temperature)
+        assertEquals(0.85f, sampler.topP)
+        assertEquals(512, sampler.maxTokens)
+        assertTrue(sampler.prompts.isEmpty())
     }
 
     @Test
@@ -85,6 +96,9 @@ class SillyTavernResourceImporterTest {
               {"filename": "backgrounds/tavern day.jpg", "type": "background"},
               {"filename": "Eldoria.json", "type": "world"},
               {"filename": "presets/openai/Default.json", "type": "openai_preset"},
+              {"filename": "presets/textgen/Universal-Light.json", "type": "textgen_preset"},
+              {"filename": "presets/kobold/Neutral.json", "type": "kobold_preset"},
+              {"filename": "presets/novel/Tea_Time-Kayra.json", "type": "novel_preset"},
               {"filename": "presets/context/Llama 3 Instruct.json", "type": "context"},
               {"filename": "presets/instruct/ChatML.json", "type": "instruct"},
               {"filename": "default_Seraphina.png", "type": "character"}
@@ -92,13 +106,22 @@ class SillyTavernResourceImporterTest {
             """.trimIndent()
         )
 
-        assertEquals(5, assets.size)
+        assertEquals(8, assets.size)
         assertEquals(
-            listOf("world", "openai_preset", "context", "instruct", "character"),
+            listOf(
+                "world",
+                "openai_preset",
+                "textgen_preset",
+                "kobold_preset",
+                "novel_preset",
+                "context",
+                "instruct",
+                "character",
+            ),
             assets.map { it.type },
         )
         assertTrue(assets.last().downloadUrl.endsWith("default_Seraphina.png"))
         assertTrue(assets[1].downloadUrl.contains("presets/openai/Default.json"))
-        assertTrue(assets[2].downloadUrl.contains("Llama%203%20Instruct.json"))
+        assertTrue(assets[5].downloadUrl.contains("Llama%203%20Instruct.json"))
     }
 }

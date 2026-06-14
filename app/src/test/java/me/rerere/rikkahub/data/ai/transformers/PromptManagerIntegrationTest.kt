@@ -117,6 +117,18 @@ class PromptManagerIntegrationTest {
     }
 
     @Test
+    fun `sampler-only preset keeps legacy messages`() {
+        val samplerPreset = PromptPreset(name = "Sampler", temperature = 0.7f)
+        val result = buildPromptManagerMessages(
+            assistant = assistant.copy(promptPresetId = samplerPreset.id),
+            settings = settings.copy(promptPresets = listOf(samplerPreset)),
+            messages = incoming,
+        )
+
+        assertEquals(incoming, result)
+    }
+
+    @Test
     fun `disabled persona is omitted`() {
         val s = settings.copy(personas = listOf(persona.copy(enabled = false)))
         val result = buildPromptManagerMessages(assistant, s, incoming)!!

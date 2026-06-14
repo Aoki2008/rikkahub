@@ -15,12 +15,11 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import me.rerere.common.http.await
+import me.rerere.rikkahub.AppLinks
 import me.rerere.rikkahub.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.util.Locale
-
-private const val RELEASE_API_URL = "https://api.github.com/repos/Aoki2008/rikkahub/releases/latest"
 
 class UpdateChecker(private val client: OkHttpClient) {
     private val json = Json { ignoreUnknownKeys = true }
@@ -32,7 +31,7 @@ class UpdateChecker(private val client: OkHttpClient) {
                 data = try {
                     val response = client.newCall(
                         Request.Builder()
-                            .url(RELEASE_API_URL)
+                            .url(AppLinks.RELEASES_API_URL)
                             .get()
                             .addHeader(
                                 "User-Agent",

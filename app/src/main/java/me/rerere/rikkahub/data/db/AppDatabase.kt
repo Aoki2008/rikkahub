@@ -31,7 +31,7 @@ import me.rerere.rikkahub.utils.JsonInstant
         ManagedFileEntity::class,
         FavoriteEntity::class
     ],
-    version = 21,
+    version = 22,
     autoMigrations = [
         AutoMigration(from = 1, to = 2),
         AutoMigration(from = 2, to = 3),
@@ -47,8 +47,6 @@ import me.rerere.rikkahub.utils.JsonInstant
         AutoMigration(from = 17, to = 18),
         AutoMigration(from = 18, to = 19),
         AutoMigration(from = 19, to = 20),
-        // 20 -> 21: 新增 conversation.group_id (群聊对话引用)，可空列，默认空串
-        AutoMigration(from = 20, to = 21),
     ]
 )
 @TypeConverters(TokenUsageConverter::class)
