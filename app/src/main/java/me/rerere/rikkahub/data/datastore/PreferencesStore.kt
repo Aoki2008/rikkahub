@@ -46,6 +46,7 @@ import me.rerere.rikkahub.data.model.PromptPreset
 import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.QuickMessage
+import me.rerere.rikkahub.data.model.ReasoningPreset
 import me.rerere.rikkahub.data.model.SystemPromptPreset
 import me.rerere.rikkahub.data.model.Tag
 import me.rerere.rikkahub.data.sync.s3.S3Config
@@ -159,6 +160,7 @@ class SettingsStore(
         val CONTEXT_PRESETS = stringPreferencesKey("context_presets")
         val INSTRUCT_PRESETS = stringPreferencesKey("instruct_presets")
         val SYSTEM_PROMPT_PRESETS = stringPreferencesKey("system_prompt_presets")
+        val REASONING_PRESETS = stringPreferencesKey("reasoning_presets")
 
         // 备份提醒
         val BACKUP_REMINDER_CONFIG = stringPreferencesKey("backup_reminder_config")
@@ -274,6 +276,9 @@ class SettingsStore(
                 systemPromptPresets = preferences[SYSTEM_PROMPT_PRESETS]?.let {
                     JsonInstant.decodeFromString(it)
                 } ?: emptyList(),
+                reasoningPresets = preferences[REASONING_PRESETS]?.let {
+                    JsonInstant.decodeFromString(it)
+                } ?: emptyList(),
                 webServerEnabled = preferences[WEB_SERVER_ENABLED] == true,
                 webServerPort = preferences[WEB_SERVER_PORT] ?: 8080,
                 webServerJwtEnabled = preferences[WEB_SERVER_JWT_ENABLED] == true,
@@ -337,6 +342,7 @@ class SettingsStore(
             val validContextPresetIds = settings.contextPresets.map { it.id }.toSet()
             val validInstructPresetIds = settings.instructPresets.map { it.id }.toSet()
             val validSystemPromptPresetIds = settings.systemPromptPresets.map { it.id }.toSet()
+            val validReasoningPresetIds = settings.reasoningPresets.map { it.id }.toSet()
             val asrProviders = settings.asrProviders.distinctBy { it.id }
             settings.copy(
                 providers = settings.providers.distinctBy { it.id }.map { provider ->
@@ -381,6 +387,9 @@ class SettingsStore(
                         systemPromptPresetId = assistant.systemPromptPresetId?.takeIf { id ->
                             id in validSystemPromptPresetIds
                         },
+                        reasoningPresetId = assistant.reasoningPresetId?.takeIf { id ->
+                            id in validReasoningPresetIds
+                        },
                     )
                 },
                 ttsProviders = settings.ttsProviders.distinctBy { it.id },
@@ -404,6 +413,7 @@ class SettingsStore(
                 contextPresets = settings.contextPresets.distinctBy { it.id },
                 instructPresets = settings.instructPresets.distinctBy { it.id },
                 systemPromptPresets = settings.systemPromptPresets.distinctBy { it.id },
+                reasoningPresets = settings.reasoningPresets.distinctBy { it.id },
             )
         }
         .onEach {
@@ -480,6 +490,7 @@ class SettingsStore(
             preferences[CONTEXT_PRESETS] = JsonInstant.encodeToString(settings.contextPresets)
             preferences[INSTRUCT_PRESETS] = JsonInstant.encodeToString(settings.instructPresets)
             preferences[SYSTEM_PROMPT_PRESETS] = JsonInstant.encodeToString(settings.systemPromptPresets)
+            preferences[REASONING_PRESETS] = JsonInstant.encodeToString(settings.reasoningPresets)
             settings.selectedPersonaId?.let {
                 preferences[SELECTED_PERSONA] = it.toString()
             } ?: preferences.remove(SELECTED_PERSONA)
@@ -625,6 +636,7 @@ data class Settings(
     val contextPresets: List<ContextPreset> = emptyList(),
     val instructPresets: List<InstructPreset> = emptyList(),
     val systemPromptPresets: List<SystemPromptPreset> = emptyList(),
+    val reasoningPresets: List<ReasoningPreset> = emptyList(),
     val webServerEnabled: Boolean = false,
     val webServerPort: Int = 8080,
     val webServerJwtEnabled: Boolean = false,

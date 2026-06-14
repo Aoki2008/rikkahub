@@ -256,6 +256,11 @@ private val SillyTavernExtensionCatalog = listOf(
         description = "Chat Completion and Text Completion presets bind into the prompt manager.",
     ),
     SillyTavernExtensionCompat(
+        name = "Reasoning Presets",
+        status = SillyTavernExtensionStatus.Native,
+        description = "Official ST reasoning delimiters import and split model thinking from final replies.",
+    ),
+    SillyTavernExtensionCompat(
         name = "Author's Note / Depth Prompt",
         status = SillyTavernExtensionStatus.Native,
         description = "Character-card depth prompts import as native depth injections.",

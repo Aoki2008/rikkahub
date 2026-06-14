@@ -122,11 +122,13 @@ jobs:
             --tests "me.rerere.rikkahub.data.model.PromptPresetParserTest" \
             --tests "me.rerere.rikkahub.data.ai.transformers.PromptManagerIntegrationTest" \
             --tests "me.rerere.rikkahub.data.model.TextCompletionPresetParserTest" \
+            --tests "me.rerere.rikkahub.data.model.ReasoningPresetParserTest" \
             --tests "me.rerere.rikkahub.data.model.SillyTavernRegexParserTest" \
             --tests "me.rerere.rikkahub.data.model.SillyTavernQuickReplyParserTest" \
             --tests "me.rerere.rikkahub.data.model.SillyTavernResourceImporterTest" \
             --tests "me.rerere.rikkahub.data.model.QuickMessageExecutionTest" \
             --tests "me.rerere.rikkahub.data.ai.TextCompletionPromptAssemblerTest" \
+            --tests "me.rerere.rikkahub.data.ai.transformers.ReasoningExtractionTest" \
             --tests "me.rerere.rikkahub.data.ai.transformers.TextCompletionPresetIntegrationTest" \
             --tests "me.rerere.rikkahub.ui.pages.assistant.detail.AssistantImporterTest" \
             --tests "me.rerere.rikkahub.AppFeaturesTest" \

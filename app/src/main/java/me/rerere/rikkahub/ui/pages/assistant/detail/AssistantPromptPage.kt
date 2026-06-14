@@ -230,6 +230,12 @@ private fun AssistantPromptContent(
             onUpdate = onUpdate,
         )
 
+        ReasoningPresetCard(
+            assistant = assistant,
+            settings = settings,
+            onUpdate = onUpdate,
+        )
+
         CharacterCardExportButton(
             assistant = assistant,
             lorebooks = settings.lorebooks,

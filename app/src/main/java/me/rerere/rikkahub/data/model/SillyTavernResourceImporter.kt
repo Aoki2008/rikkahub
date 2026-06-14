@@ -23,6 +23,7 @@ data class SillyTavernResourceImport(
     val contextPresets: List<ContextPreset> = emptyList(),
     val instructPresets: List<InstructPreset> = emptyList(),
     val systemPromptPresets: List<SystemPromptPreset> = emptyList(),
+    val reasoningPresets: List<ReasoningPreset> = emptyList(),
     val lorebooks: List<Lorebook> = emptyList(),
     val quickMessages: List<QuickMessage> = emptyList(),
     val regexes: List<AssistantRegex> = emptyList(),
@@ -32,6 +33,7 @@ data class SillyTavernResourceImport(
             contextPresets.size +
             instructPresets.size +
             systemPromptPresets.size +
+            reasoningPresets.size +
             lorebooks.size +
             quickMessages.size
 
@@ -44,6 +46,7 @@ data class SillyTavernResourceImport(
             contextPresets = contextPresets + other.contextPresets,
             instructPresets = instructPresets + other.instructPresets,
             systemPromptPresets = systemPromptPresets + other.systemPromptPresets,
+            reasoningPresets = reasoningPresets + other.reasoningPresets,
             lorebooks = lorebooks + other.lorebooks,
             quickMessages = quickMessages + other.quickMessages,
             regexes = regexes + other.regexes,
@@ -98,6 +101,7 @@ private fun parseSillyTavernResourceObject(
 
     val promptPreset = parsePromptPresetOrNull(json, name)
     val textCompletionPreset = parseTextCompletionPresetOrNull(json, name)
+    val reasoningPreset = parseReasoningPresetOrNull(json, name)
     val lorebook = parseLorebookOrNull(json, name)
     val quickMessages = parseSillyTavernQuickReplies(json)
     val regexes = parseSillyTavernRegexScripts(json)
@@ -110,6 +114,7 @@ private fun parseSillyTavernResourceObject(
             .map { it.preset },
         systemPromptPresets = listOfNotNull(textCompletionPreset as? TextCompletionPresetImport.SystemPrompt)
             .map { it.preset },
+        reasoningPresets = listOfNotNull(reasoningPreset),
         lorebooks = listOfNotNull(lorebook),
         quickMessages = quickMessages,
         regexes = regexes,
@@ -152,6 +157,10 @@ private fun parseExplicitExportObject(
             ?.let { parseSillyTavernSystemPromptPreset(it, name) }
             ?.let { SillyTavernResourceImport(systemPromptPresets = listOf(it)) }
 
+        "reasoning" -> data.asObjectOrNull()
+            ?.let { parseSillyTavernReasoningPreset(it, name) }
+            ?.let { SillyTavernResourceImport(reasoningPresets = listOf(it)) }
+
         "quick_reply", "quick_replies" -> SillyTavernResourceImport(
             quickMessages = parseSillyTavernQuickReplies(data)
         )
@@ -186,6 +195,11 @@ private fun parseTextCompletionPresetOrNull(
     parseSillyTavernTextCompletionPreset(json, fallbackName)
         .takeUnless { it is TextCompletionPresetImport.Unknown }
 
+private fun parseReasoningPresetOrNull(json: JsonObject, fallbackName: String): ReasoningPreset? {
+    if (!json.looksLikeReasoningPreset()) return null
+    return parseSillyTavernReasoningPreset(json, fallbackName)
+}
+
 private fun parseLorebookOrNull(json: JsonObject, fallbackName: String): Lorebook? {
     if (!json.containsKey("entries")) return null
     return runCatching {
@@ -214,6 +228,7 @@ private val SillyTavernCompatibleAssetTypes = setOf(
     "instruct",
     "system_prompt",
     "sysprompt",
+    "reasoning",
     "quick_reply",
     "quick_replies",
     "regex",

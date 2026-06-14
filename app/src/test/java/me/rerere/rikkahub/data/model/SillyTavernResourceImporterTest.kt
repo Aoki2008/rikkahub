@@ -66,6 +66,12 @@ class SillyTavernResourceImporterTest {
                 "temperature": 0.7,
                 "top_p": 0.85,
                 "max_length": 512
+              },
+              {
+                "name": "Think XML",
+                "prefix": "<think>",
+                "suffix": "</think>",
+                "separator": "\n\n"
               }
             ]
             """.trimIndent(),
@@ -76,16 +82,18 @@ class SillyTavernResourceImporterTest {
         assertEquals(1, result.contextPresets.size)
         assertEquals(1, result.instructPresets.size)
         assertEquals(1, result.systemPromptPresets.size)
+        assertEquals(1, result.reasoningPresets.size)
         assertEquals(1, result.lorebooks.size)
         assertEquals(1, result.quickMessages.size)
         assertEquals(1, result.regexes.size)
-        assertEquals(7, result.globalResourceCount)
-        assertEquals(8, result.detectedResourceCount)
+        assertEquals(8, result.globalResourceCount)
+        assertEquals(9, result.detectedResourceCount)
         val sampler = result.promptPresets.single { it.name == "Sampler only" }
         assertEquals(0.7f, sampler.temperature)
         assertEquals(0.85f, sampler.topP)
         assertEquals(512, sampler.maxTokens)
         assertTrue(sampler.prompts.isEmpty())
+        assertEquals("<think>", result.reasoningPresets.single().prefix)
     }
 
     @Test
@@ -101,12 +109,13 @@ class SillyTavernResourceImporterTest {
               {"filename": "presets/novel/Tea_Time-Kayra.json", "type": "novel_preset"},
               {"filename": "presets/context/Llama 3 Instruct.json", "type": "context"},
               {"filename": "presets/instruct/ChatML.json", "type": "instruct"},
+              {"filename": "presets/reasoning/Think XML.json", "type": "reasoning"},
               {"filename": "default_Seraphina.png", "type": "character"}
             ]
             """.trimIndent()
         )
 
-        assertEquals(8, assets.size)
+        assertEquals(9, assets.size)
         assertEquals(
             listOf(
                 "world",
@@ -116,6 +125,7 @@ class SillyTavernResourceImporterTest {
                 "novel_preset",
                 "context",
                 "instruct",
+                "reasoning",
                 "character",
             ),
             assets.map { it.type },
@@ -123,5 +133,6 @@ class SillyTavernResourceImporterTest {
         assertTrue(assets.last().downloadUrl.endsWith("default_Seraphina.png"))
         assertTrue(assets[1].downloadUrl.contains("presets/openai/Default.json"))
         assertTrue(assets[5].downloadUrl.contains("Llama%203%20Instruct.json"))
+        assertTrue(assets[7].downloadUrl.contains("Think%20XML.json"))
     }
 }

@@ -57,6 +57,7 @@ data class SillyTavernImportReport(
         if (resources.contextPresets.isNotEmpty()) add("context presets ${resources.contextPresets.size}")
         if (resources.instructPresets.isNotEmpty()) add("instruct presets ${resources.instructPresets.size}")
         if (resources.systemPromptPresets.isNotEmpty()) add("system prompts ${resources.systemPromptPresets.size}")
+        if (resources.reasoningPresets.isNotEmpty()) add("reasoning presets ${resources.reasoningPresets.size}")
         if (resources.lorebooks.isNotEmpty()) add("lorebooks ${resources.lorebooks.size}")
         if (resources.quickMessages.isNotEmpty()) add("quick replies ${resources.quickMessages.size}")
         if (resources.regexes.isNotEmpty()) add("regex scripts ${resources.regexes.size}")
@@ -262,6 +263,7 @@ class SillyTavernResourcesVM(
                 contextPresets = settings.contextPresets.mergeDistinctByName(resources.contextPresets) { it.name },
                 instructPresets = settings.instructPresets.mergeDistinctByName(resources.instructPresets) { it.name },
                 systemPromptPresets = settings.systemPromptPresets.mergeDistinctByName(resources.systemPromptPresets) { it.name },
+                reasoningPresets = settings.reasoningPresets.mergeDistinctByName(resources.reasoningPresets) { it.name },
                 lorebooks = settings.lorebooks.mergeDistinctByName(resources.lorebooks) { it.name },
                 quickMessages = settings.quickMessages.mergeDistinctQuickMessages(resources.quickMessages),
                 assistants = if (resources.regexes.isEmpty()) {

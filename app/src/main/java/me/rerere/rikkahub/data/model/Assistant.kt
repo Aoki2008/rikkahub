@@ -52,6 +52,7 @@ data class Assistant(
     val contextPresetId: Uuid? = null, // 绑定的 Text Completion context 预设
     val instructPresetId: Uuid? = null, // 绑定的 Text Completion instruct 预设
     val systemPromptPresetId: Uuid? = null, // 绑定的 Text Completion system prompt 预设(可选)
+    val reasoningPresetId: Uuid? = null, // 绑定的 SillyTavern reasoning 预设(思考标签分离)
 )
 
 /**
