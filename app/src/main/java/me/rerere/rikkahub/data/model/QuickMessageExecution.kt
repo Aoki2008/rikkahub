@@ -126,7 +126,7 @@ private fun executeQuickMessageSlashCommands(
         val arguments = if (command.name.equals("if", ignoreCase = true)) {
             parseIfSlashArguments(command.args, pipe, state)
         } else {
-            parseSlashArguments(command.args, pipe, state)
+            parseSlashArguments(command.name, command.args, pipe, state)
         }
         val args = arguments.unnamed
         when (command.name.lowercase()) {
@@ -826,16 +826,19 @@ private data class SlashArguments(
 )
 
 private fun parseSlashArguments(
+    commandName: String,
     args: String,
     pipe: String,
     state: QuickMessageVariableState,
 ): SlashArguments {
     var remaining = args.trimStart()
     val named = mutableMapOf<String, String>()
+    val allowedNamedArguments = commandName.allowedSlashNamedArguments()
 
     while (true) {
         val match = leadingNamedArgumentRegex.find(remaining) ?: break
         val key = match.groupValues[1].lowercase()
+        if (key !in allowedNamedArguments) break
         val value = match.groupValues
             .drop(2)
             .firstOrNull { it.isNotEmpty() }
@@ -851,6 +854,20 @@ private fun parseSlashArguments(
         unnamed = state.expandMacros(remaining, pipe).trim(),
     )
 }
+
+private fun String.allowedSlashNamedArguments(): Set<String> =
+    when (lowercase()) {
+        "echo" -> setOf("severity")
+        "getvar", "setvar", "addvar",
+        "getglobalvar", "setglobalvar", "addglobalvar" ->
+            setOf("key", "name", "value", "increment", "index", "as")
+        "incvar", "decvar", "flushvar",
+        "incglobalvar", "decglobalvar", "flushglobalvar" ->
+            setOf("key", "name")
+        "sendas" -> setOf("name", "character", "char")
+        "expression-set" -> setOf("name", "expression", "sprite", "label")
+        else -> emptySet()
+    }
 
 private fun parseIfSlashArguments(
     args: String,
