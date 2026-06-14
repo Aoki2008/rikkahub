@@ -488,12 +488,7 @@ private fun keywordMatches(
 ): Boolean {
     if (keyword.isBlank()) return false
     if (useRegex) {
-        return try {
-            val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
-            Regex(keyword, options).containsMatchIn(context)
-        } catch (e: Exception) {
-            false
-        }
+        return compileKeywordRegex(keyword, caseSensitive)?.containsMatchIn(context) ?: false
     }
     if (matchWholeWords) {
         return try {
@@ -504,6 +499,17 @@ private fun keywordMatches(
         }
     }
     return context.contains(keyword, ignoreCase = !caseSensitive)
+}
+
+private fun compileKeywordRegex(pattern: String, caseSensitive: Boolean): Regex? {
+    val options = if (caseSensitive) emptySet() else setOf(RegexOption.IGNORE_CASE)
+    return runCatching {
+        Regex(pattern, options)
+    }.recoverCatching {
+        val normalized = normalizeRegexForJvm(pattern)
+        if (normalized == pattern) throw it
+        Regex(normalized, options)
+    }.getOrNull()
 }
 
 /**

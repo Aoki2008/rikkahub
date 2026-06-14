@@ -861,6 +861,35 @@ class PromptInjectionTransformerTest {
     }
 
     @Test
+    fun `lorebook regex keyword with SillyTavern comment braces should match`() {
+        val lorebookId = Uuid.random()
+        val regexInjection = createRegexInjection(
+            keywords = listOf("\\{\\{//[\\s\\S]*?}}"),
+            useRegex = true,
+            content = "Comment marker content"
+        )
+        val lorebook = createLorebook(
+            id = lorebookId,
+            entries = listOf(regexInjection)
+        )
+
+        val messages = listOf(
+            UIMessage.system("System prompt"),
+            UIMessage.user("Visible {{//hidden note}} text")
+        )
+
+        val result = transformMessages(
+            messages = messages,
+            assistant = createAssistant(lorebookIds = setOf(lorebookId)),
+            modeInjections = emptyList(),
+            lorebooks = listOf(lorebook)
+        )
+
+        val systemText = getMessageText(result[0])
+        assertTrue(systemText.contains("Comment marker content"))
+    }
+
+    @Test
     fun `scanDepth should limit message scanning range`() {
         val lorebookId = Uuid.random()
         val regexInjection = createRegexInjection(

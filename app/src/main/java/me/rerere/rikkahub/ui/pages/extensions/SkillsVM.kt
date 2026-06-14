@@ -5,8 +5,6 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import java.io.ByteArrayInputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.LinkedHashMap
 import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
@@ -14,14 +12,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.rerere.rikkahub.BuildConfig
 import me.rerere.rikkahub.data.files.FileUtils
 import me.rerere.rikkahub.data.files.SkillFrontmatterParser
 import me.rerere.rikkahub.data.files.SkillManager
 import me.rerere.rikkahub.data.files.SkillMetadata
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.json.JSONArray
 
 class SkillsVM(
     private val skillManager: SkillManager,
+    private val httpClient: OkHttpClient,
 ) : ViewModel() {
     private val _skills = MutableStateFlow<List<SkillMetadata>>(emptyList())
     val skills = _skills.asStateFlow()
@@ -310,15 +312,18 @@ class SkillsVM(
     }
 
     private fun downloadText(url: String): String? {
-        val connection = URL(url).openConnection() as HttpURLConnection
-        connection.connectTimeout = 10_000
-        connection.readTimeout = 30_000
-        connection.setRequestProperty("Accept", "application/vnd.github+json")
-        return try {
-            if (connection.responseCode == 200) connection.inputStream.bufferedReader().readText()
-            else null
-        } finally {
-            connection.disconnect()
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .header("Accept", "application/vnd.github+json, text/plain, */*")
+            .header("User-Agent", "RikkaHub-ST/${BuildConfig.VERSION_NAME}")
+            .build()
+        return httpClient.newCall(request).execute().use { response ->
+            if (response.isSuccessful) {
+                response.body.string()
+            } else {
+                null
+            }
         }
     }
 }

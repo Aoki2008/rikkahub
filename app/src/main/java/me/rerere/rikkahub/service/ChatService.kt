@@ -769,6 +769,7 @@ class ChatService(
                 outputTransformers = outputTransformers,
                 senderId = senderId,
                 tools = buildList {
+                    val activeMcpManager = mcpManager
                     if (settings.enableWebSearch) {
                         addAll(createSearchTools(settings))
                     }
@@ -782,8 +783,8 @@ class ChatService(
                             )
                         )
                     }
-                    if (AppFeatures.MCP) {
-                        mcpManager?.getAllAvailableTools().orEmpty().forEach { (serverId, tool) ->
+                    if (AppFeatures.MCP && activeMcpManager != null) {
+                        activeMcpManager.getAllAvailableTools().forEach { (serverId, tool) ->
                             add(
                                 Tool(
                                     name = "mcp__" + tool.name,
@@ -791,7 +792,7 @@ class ChatService(
                                     parameters = { tool.inputSchema },
                                     needsApproval = tool.needsApproval,
                                     execute = {
-                                        mcpManager.callTool(serverId, tool.name, it.jsonObject)
+                                        activeMcpManager.callTool(serverId, tool.name, it.jsonObject)
                                     },
                                 )
                             )
