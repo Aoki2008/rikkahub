@@ -136,10 +136,12 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
           script: |
-            APK=$(ls apk/*x86_64*debug*.apk 2>/dev/null | head -1)
-            [ -z "$APK" ] && APK=$(ls apk/*universal*debug*.apk 2>/dev/null | head -1)
-            [ -z "$APK" ] && APK=$(ls apk/*debug*.apk 2>/dev/null | head -1)
-            echo "Installing $APK"
+            echo "=== artifact contents ==="; ls -R apk || true
+            APK=$(find apk -name '*x86_64*.apk' | head -1)
+            [ -z "$APK" ] && APK=$(find apk -name '*universal*.apk' | head -1)
+            [ -z "$APK" ] && APK=$(find apk -name '*.apk' | head -1)
+            echo "Selected APK: $APK"
+            if [ -z "$APK" ]; then echo "No APK found in artifact"; exit 1; fi
             adb install -r "$APK"
             adb logcat -c
             adb shell am start -W -n me.rerere.rikkahub.st.debug/me.rerere.rikkahub.RouteActivity
