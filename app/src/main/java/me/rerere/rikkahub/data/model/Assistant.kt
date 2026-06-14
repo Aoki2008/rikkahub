@@ -172,7 +172,7 @@ private fun expandRegexReplacement(
     trimStrings: List<String>,
 ): String {
     val normalizedReplacement = replacement
-        .replace(Regex("\\{\\{match\\}\\}", RegexOption.IGNORE_CASE), "\$0")
+        .replace(Regex("\\{\\{match\\}\\}", RegexOption.IGNORE_CASE)) { "\$0" }
         .replace(Regex("\\$<([A-Za-z][A-Za-z0-9_]*)>")) { "\${${it.groupValues[1]}}" }
     val result = StringBuilder()
     var index = 0
