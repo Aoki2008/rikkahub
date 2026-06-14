@@ -1,6 +1,7 @@
 package me.rerere.rikkahub.data.ai.transformers
 
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.content
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -14,6 +15,7 @@ import me.rerere.ai.provider.providers.openai.ChatCompletionsAPI
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.ai.util.KeyRoulette
+import me.rerere.rikkahub.data.ai.buildTextGenerationParams
 import me.rerere.rikkahub.data.datastore.Settings
 import me.rerere.rikkahub.data.model.Assistant
 import me.rerere.rikkahub.data.model.CharacterCard
@@ -23,6 +25,7 @@ import me.rerere.rikkahub.data.model.InstructPreset
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.Persona
 import me.rerere.rikkahub.data.model.PromptInjection
+import me.rerere.rikkahub.data.model.PromptPreset
 import me.rerere.rikkahub.data.model.SystemPromptPreset
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -223,6 +226,53 @@ class TextCompletionPresetIntegrationTest {
         assertEquals(listOf("\nHero:", "\nMira:"), googleBody["generationConfig"]!!.jsonObject.stringArray("stopSequences"))
     }
 
+    @Test
+    fun `bound prompt preset applies SillyTavern penalty samplers`() {
+        val model = Model(modelId = "test-model", displayName = "Test Model")
+        val preset = PromptPreset(
+            temperature = 0.7f,
+            topP = 0.8f,
+            maxTokens = 321,
+            frequencyPenalty = 0.35f,
+            presencePenalty = 0.45f,
+        )
+        val params = buildTextGenerationParams(
+            model = model,
+            assistant = Assistant(
+                promptPresetId = preset.id,
+                temperature = 1.8f,
+                topP = 0.2f,
+                maxTokens = 999,
+            ),
+            settings = Settings(promptPresets = listOf(preset)),
+        )
+
+        assertEquals(0.7f, params.temperature)
+        assertEquals(0.8f, params.topP)
+        assertEquals(321, params.maxTokens)
+        assertEquals(0.35f, params.frequencyPenalty)
+        assertEquals(0.45f, params.presencePenalty)
+    }
+
+    @Test
+    fun `provider request bodies serialize SillyTavern penalty samplers`() {
+        val model = Model(modelId = "test-model", displayName = "Test Model")
+        val params = TextGenerationParams(
+            model = model,
+            frequencyPenalty = 0.35f,
+            presencePenalty = 0.45f,
+        )
+
+        val chatBody = ChatCompletionsAPI(OkHttpClient(), KeyRoulette.default()).buildChatRequest(params)
+        assertEquals(0.35f, chatBody.floatValue("frequency_penalty"))
+        assertEquals(0.45f, chatBody.floatValue("presence_penalty"))
+
+        val googleBody = GoogleProvider(OkHttpClient()).buildGoogleRequest(params)
+        val googleConfig = googleBody["generationConfig"]!!.jsonObject
+        assertEquals(0.35f, googleConfig.floatValue("frequencyPenalty"))
+        assertEquals(0.45f, googleConfig.floatValue("presencePenalty"))
+    }
+
     private fun assertInOrder(text: String, vararg fragments: String) {
         var cursor = -1
         fragments.forEach { fragment ->
@@ -272,4 +322,7 @@ class TextCompletionPresetIntegrationTest {
 
     private fun JsonObject.stringArray(key: String): List<String> =
         get(key)!!.jsonArray.map { it.jsonPrimitive.content }
+
+    private fun JsonObject.floatValue(key: String): Float =
+        get(key)!!.jsonPrimitive.content.toFloat()
 }
