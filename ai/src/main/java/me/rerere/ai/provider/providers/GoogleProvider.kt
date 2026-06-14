@@ -366,6 +366,8 @@ class GoogleProvider(private val client: OkHttpClient, context: Context? = null)
         put("generationConfig", buildJsonObject {
             if (params.temperature != null) put("temperature", params.temperature)
             if (params.topP != null) put("topP", params.topP)
+            if (params.frequencyPenalty != null) put("frequencyPenalty", params.frequencyPenalty)
+            if (params.presencePenalty != null) put("presencePenalty", params.presencePenalty)
             if (params.maxTokens != null) put("maxOutputTokens", params.maxTokens)
             if (params.stopSequences.isNotEmpty()) {
                 putJsonArray("stopSequences") {

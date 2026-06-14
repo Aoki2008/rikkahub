@@ -59,6 +59,36 @@ sealed interface GenerationChunk {
     ) : GenerationChunk
 }
 
+internal fun buildTextGenerationParams(
+    model: Model,
+    assistant: Assistant,
+    settings: Settings,
+    tools: List<Tool> = emptyList(),
+): TextGenerationParams {
+    val boundPreset = assistant.promptPresetId
+        ?.let { id -> settings.promptPresets.firstOrNull { it.id == id } }
+
+    return TextGenerationParams(
+        model = model,
+        temperature = boundPreset?.temperature ?: assistant.temperature,
+        topP = boundPreset?.topP ?: assistant.topP,
+        frequencyPenalty = boundPreset?.frequencyPenalty,
+        presencePenalty = boundPreset?.presencePenalty,
+        maxTokens = boundPreset?.maxTokens ?: assistant.maxTokens,
+        tools = tools,
+        reasoningLevel = assistant.reasoningLevel,
+        stopSequences = buildTextCompletionStopSequences(assistant, settings),
+        customHeaders = buildList {
+            addAll(assistant.customHeaders)
+            addAll(model.customHeaders)
+        },
+        customBody = buildList {
+            addAll(assistant.customBodies)
+            addAll(model.customBodies)
+        },
+    )
+}
+
 class GenerationHandler(
     private val context: Context,
     private val providerManager: ProviderManager,
@@ -396,25 +426,11 @@ class GenerationHandler(
         )
 
         var messages: List<UIMessage> = messages
-        // 绑定 Chat Completion 预设时，采样参数优先用预设的值
-        val boundPreset = assistant.promptPresetId
-            ?.let { id -> settings.promptPresets.firstOrNull { it.id == id } }
-        val params = TextGenerationParams(
+        val params = buildTextGenerationParams(
             model = model,
-            temperature = boundPreset?.temperature ?: assistant.temperature,
-            topP = boundPreset?.topP ?: assistant.topP,
-            maxTokens = boundPreset?.maxTokens ?: assistant.maxTokens,
+            assistant = assistant,
+            settings = settings,
             tools = tools,
-            reasoningLevel = assistant.reasoningLevel,
-            stopSequences = buildTextCompletionStopSequences(assistant, settings),
-            customHeaders = buildList {
-                addAll(assistant.customHeaders)
-                addAll(model.customHeaders)
-            },
-            customBody = buildList {
-                addAll(assistant.customBodies)
-                addAll(model.customBodies)
-            }
         )
         if (stream) {
             aiLoggingManager.addLog(
