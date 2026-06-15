@@ -13,6 +13,7 @@ import kotlin.uuid.Uuid
 
 private const val ST_REGEX_USER_INPUT = 1
 private const val ST_REGEX_AI_OUTPUT = 2
+private const val ST_REGEX_WORLD_INFO = 5
 private const val ST_REGEX_REASONING = 6
 
 /**
@@ -74,6 +75,9 @@ private fun List<Int>.toAssistantRegexScopes(): Set<AssistantAffectScope> =
     buildSet {
         if (ST_REGEX_USER_INPUT in this@toAssistantRegexScopes) {
             add(AssistantAffectScope.USER)
+        }
+        if (ST_REGEX_WORLD_INFO in this@toAssistantRegexScopes) {
+            add(AssistantAffectScope.WORLD_INFO)
         }
         if (ST_REGEX_AI_OUTPUT in this@toAssistantRegexScopes || ST_REGEX_REASONING in this@toAssistantRegexScopes) {
             add(AssistantAffectScope.ASSISTANT)

@@ -4,6 +4,8 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantAffectScope
+import me.rerere.rikkahub.data.model.AssistantRegex
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.Lorebook
@@ -770,6 +772,50 @@ class PromptInjectionTransformerTest {
 
         val systemText = getMessageText(result[0])
         assertTrue(systemText.contains("Always active content"))
+    }
+
+    @Test
+    fun `lorebook content should apply world info regex before injection`() {
+        val lorebookId = Uuid.random()
+        val regexInjection = createRegexInjection(
+            keywords = listOf("dragon"),
+            content = "The dragon keeps a secret"
+        )
+        val lorebook = createLorebook(
+            id = lorebookId,
+            entries = listOf(regexInjection)
+        )
+        val assistant = createAssistant(lorebookIds = setOf(lorebookId)).copy(
+            regexes = listOf(
+                AssistantRegex(
+                    id = Uuid.random(),
+                    findRegex = "dragon",
+                    replaceString = "wyrm",
+                    affectingScope = setOf(AssistantAffectScope.WORLD_INFO),
+                ),
+                AssistantRegex(
+                    id = Uuid.random(),
+                    findRegex = "secret",
+                    replaceString = "hidden",
+                    affectingScope = setOf(AssistantAffectScope.USER),
+                )
+            )
+        )
+
+        val result = transformMessages(
+            messages = listOf(
+                UIMessage.system("System prompt"),
+                UIMessage.user("Tell me about the dragon")
+            ),
+            assistant = assistant,
+            modeInjections = emptyList(),
+            lorebooks = listOf(lorebook)
+        )
+
+        val systemText = getMessageText(result[0])
+        assertTrue(systemText.contains("The wyrm keeps a secret"))
+        assertFalse(systemText.contains("The dragon keeps a secret"))
+        assertFalse(systemText.contains("The wyrm keeps a hidden"))
     }
 
     @Test

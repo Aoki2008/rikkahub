@@ -99,6 +99,26 @@ class SillyTavernRegexParserTest {
     }
 
     @Test
+    fun `parse world info placement keeps lorebook scoped regex`() {
+        val raw = """
+            {
+              "scriptName": "World info alias",
+              "findRegex": "dragon",
+              "replaceString": "wyrm",
+              "placement": [5],
+              "disabled": false,
+              "promptOnly": true
+            }
+        """.trimIndent()
+
+        val regexes = parseSillyTavernRegexScripts(json.parseToJsonElement(raw))
+
+        assertEquals(1, regexes.size)
+        assertEquals("World info alias", regexes.single().name)
+        assertEquals(setOf(AssistantAffectScope.WORLD_INFO), regexes.single().affectingScope)
+    }
+
+    @Test
     fun `imported regex runs with JS literal flags and match macro`() {
         val raw = """
             {

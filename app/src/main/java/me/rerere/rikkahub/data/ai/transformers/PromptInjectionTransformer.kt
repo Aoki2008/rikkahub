@@ -4,11 +4,13 @@ import me.rerere.ai.core.MessageRole
 import me.rerere.ai.ui.UIMessage
 import me.rerere.ai.ui.UIMessagePart
 import me.rerere.rikkahub.data.model.Assistant
+import me.rerere.rikkahub.data.model.AssistantAffectScope
 import me.rerere.rikkahub.data.model.InjectionPosition
 import me.rerere.rikkahub.data.model.PromptInjection
 import me.rerere.rikkahub.data.model.Lorebook
 import me.rerere.rikkahub.data.model.extractContextForMatching
 import me.rerere.rikkahub.data.model.isTriggered
+import me.rerere.rikkahub.data.model.replaceRegexes
 import kotlin.random.Random
 import kotlin.uuid.Uuid
 
@@ -127,10 +129,27 @@ internal fun collectInjections(
 
         // 应用字符预算（取启用世界书中最大的非零预算）
         val budget = enabledLorebooks.mapNotNull { it.tokenBudget.takeIf { b -> b > 0 } }.maxOrNull() ?: 0
-        injections.addAll(applyTokenBudget(selected, budget))
+        val budgeted = applyTokenBudget(selected, budget)
+        injections.addAll(applyWorldInfoRegexes(budgeted, assistant))
     }
 
     return injections
+}
+
+private fun applyWorldInfoRegexes(
+    entries: List<PromptInjection.RegexInjection>,
+    assistant: Assistant,
+): List<PromptInjection.RegexInjection> {
+    if (assistant.regexes.none { AssistantAffectScope.WORLD_INFO in it.affectingScope }) return entries
+
+    return entries.mapNotNull { entry ->
+        val content = entry.content.replaceRegexes(
+            assistant = assistant,
+            scope = AssistantAffectScope.WORLD_INFO,
+            visual = false,
+        )
+        if (content.isEmpty()) null else if (content == entry.content) entry else entry.copy(content = content)
+    }
 }
 
 /**

@@ -320,6 +320,7 @@ data class AssistantMemory(
 enum class AssistantAffectScope {
     USER,
     ASSISTANT,
+    WORLD_INFO,
 }
 
 @Serializable
