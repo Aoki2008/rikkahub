@@ -22,6 +22,7 @@ data class QuickMessageExecutionPlan(
     val globalVariables: Map<String, String> = emptyMap(),
     val variablesUpdated: Boolean = false,
     val expressionLabel: String? = null,
+    val personaName: String? = null,
     val outputPipe: String = "",
     val aborted: Boolean = false,
 )
@@ -112,6 +113,7 @@ private fun executeQuickMessageSlashCommands(
     var hasInputUpdate = false
     var aborted = false
     var expressionLabel: String? = null
+    var personaName: String? = null
     val unsupported = mutableListOf<String>()
     val toastMessages = mutableListOf<String>()
     val chatMessages = mutableListOf<QuickMessageChatMessage>()
@@ -199,6 +201,7 @@ private fun executeQuickMessageSlashCommands(
                         toastMessages += branchPlan.toastMessages
                         chatMessages += branchPlan.chatMessages
                         branchPlan.expressionLabel?.let { expressionLabel = it }
+                        branchPlan.personaName?.let { personaName = it }
                         state.replaceWith(branchPlan.localVariables, branchPlan.globalVariables)
                         pipe = branchPlan.outputPipe
                         if (branchPlan.aborted) {
@@ -364,6 +367,17 @@ private fun executeQuickMessageSlashCommands(
                 }
             }
 
+            "persona" -> {
+                hasCompatibleCommand = true
+                val name = resolvePersonaName(arguments, args, pipe)
+                if (name.isNotBlank()) {
+                    personaName = name
+                    pipe = name
+                } else {
+                    unsupported += "/${command.name}"
+                }
+            }
+
             "expression-set" -> {
                 hasCompatibleCommand = true
                 val label = resolveExpressionLabel(arguments, args, pipe)
@@ -398,6 +412,7 @@ private fun executeQuickMessageSlashCommands(
         globalVariables = state.globalVariables(),
         variablesUpdated = state.variablesUpdated(),
         expressionLabel = expressionLabel,
+        personaName = personaName,
         outputPipe = pipe,
         aborted = aborted,
     )
@@ -676,6 +691,14 @@ private fun resolveExpressionLabel(
         ?: arguments.named["label"]
         ?: resolveSlashArgument(args, pipe)
 
+private fun resolvePersonaName(
+    arguments: SlashArguments,
+    args: String,
+    pipe: String,
+): String =
+    arguments.named["name"]
+        ?: resolveSlashArgument(args, pipe)
+
 private fun splitFirstSlashArgument(value: String): Pair<String, String> {
     val trimmed = value.trimStart()
     if (trimmed.isBlank()) return "" to ""
@@ -866,6 +889,7 @@ private fun String.allowedSlashNamedArguments(): Set<String> =
             setOf("key", "name")
         "sendas" -> setOf("name", "character", "char")
         "expression-set" -> setOf("name", "expression", "sprite", "label")
+        "persona" -> setOf("name", "mode")
         else -> emptySet()
     }
 

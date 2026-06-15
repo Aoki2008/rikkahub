@@ -196,6 +196,25 @@ class QuickMessageExecutionTest {
     }
 
     @Test
+    fun `persona slash command requests active persona switch`() {
+        val quickMessage = QuickMessage(
+            title = "Use scout persona",
+            content = "/persona \"Night Scout\" | /echo persona={{pipe}}",
+            sendImmediately = true,
+        )
+
+        val plan = buildQuickMessageExecutionPlan(
+            quickMessage = quickMessage,
+            currentInput = "Keep draft",
+        )
+
+        assertEquals("Keep draft", plan.inputText)
+        assertEquals(false, plan.inputUpdated)
+        assertEquals("Night Scout", plan.personaName)
+        assertEquals(listOf("persona=Night Scout"), plan.toastMessages)
+    }
+
+    @Test
     fun `unsupported slash command is reported while compatible commands still run`() {
         val quickMessage = QuickMessage(
             title = "Mixed",

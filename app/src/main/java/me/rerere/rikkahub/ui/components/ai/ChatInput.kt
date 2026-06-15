@@ -143,7 +143,7 @@ fun ChatInput(
     onCancelClick: () -> Unit,
     onSendClick: () -> Unit,
     onLongSendClick: () -> Unit,
-    onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
+    onApplyQuickMessageState: (Map<String, String>?, Map<String, String>?, String?) -> Unit,
     onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
     onApplyQuickMessageExpression: (String) -> Unit,
 ) {
@@ -388,7 +388,7 @@ fun ChatInput(
                         state = state,
                         onSendMessage = { sendMessage() },
                         onSendMessageWithoutAnswer = { sendMessageWithoutAnswer() },
-                        onApplyQuickMessageVariables = onApplyQuickMessageVariables,
+                        onApplyQuickMessageState = onApplyQuickMessageState,
                         onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
                         onApplyQuickMessageExpression = onApplyQuickMessageExpression,
                     )
@@ -604,7 +604,7 @@ private fun TextInputRow(
     state: ChatInputState,
     onSendMessage: () -> Unit,
     onSendMessageWithoutAnswer: () -> Unit,
-    onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
+    onApplyQuickMessageState: (Map<String, String>?, Map<String, String>?, String?) -> Unit,
     onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
     onApplyQuickMessageExpression: (String) -> Unit,
 ) {
@@ -725,7 +725,7 @@ private fun TextInputRow(
                         state = state,
                         onSendMessage = onSendMessage,
                         onSendMessageWithoutAnswer = onSendMessageWithoutAnswer,
-                        onApplyQuickMessageVariables = onApplyQuickMessageVariables,
+                        onApplyQuickMessageState = onApplyQuickMessageState,
                         onApplyQuickMessageChatMessages = onApplyQuickMessageChatMessages,
                         onApplyQuickMessageExpression = onApplyQuickMessageExpression,
                     )
@@ -748,7 +748,7 @@ private fun QuickMessageButton(
     state: ChatInputState,
     onSendMessage: () -> Unit,
     onSendMessageWithoutAnswer: () -> Unit,
-    onApplyQuickMessageVariables: (Map<String, String>, Map<String, String>) -> Unit,
+    onApplyQuickMessageState: (Map<String, String>?, Map<String, String>?, String?) -> Unit,
     onApplyQuickMessageChatMessages: (List<QuickMessageChatMessage>, Boolean, Map<String, String>?) -> Unit,
     onApplyQuickMessageExpression: (String) -> Unit,
 ) {
@@ -778,15 +778,18 @@ private fun QuickMessageButton(
                         )
                         val persistLocalVariablesWithChatMessages =
                             plan.variablesUpdated && plan.chatMessages.isNotEmpty()
-                        if (plan.variablesUpdated) {
-                            onApplyQuickMessageVariables(
+                        if (plan.variablesUpdated || plan.personaName != null) {
+                            val localVariables = if (plan.variablesUpdated) {
                                 if (persistLocalVariablesWithChatMessages) {
                                     conversation.scriptVariables
                                 } else {
                                     plan.localVariables
-                                },
-                                plan.globalVariables,
-                            )
+                                }
+                            } else {
+                                null
+                            }
+                            val globalVariables = plan.globalVariables.takeIf { plan.variablesUpdated }
+                            onApplyQuickMessageState(localVariables, globalVariables, plan.personaName)
                         }
                         if (plan.inputUpdated) {
                             state.setMessageText(plan.inputText)

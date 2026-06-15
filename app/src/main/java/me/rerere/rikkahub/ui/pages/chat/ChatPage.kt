@@ -328,13 +328,30 @@ private fun ChatPageContent(
                         }
                         inputState.clearInput()
                     },
-                    onApplyQuickMessageVariables = { localVariables, globalVariables ->
-                        if (conversation.scriptVariables != localVariables) {
+                    onApplyQuickMessageState = { localVariables, globalVariables, personaName ->
+                        if (localVariables != null && conversation.scriptVariables != localVariables) {
                             vm.updateConversation(conversation.copy(scriptVariables = localVariables))
                             vm.saveConversationAsync()
                         }
-                        if (setting.scriptVariables != globalVariables) {
-                            vm.updateSettings(setting.copy(scriptVariables = globalVariables))
+                        var nextSettings = setting
+                        if (globalVariables != null && nextSettings.scriptVariables != globalVariables) {
+                            nextSettings = nextSettings.copy(scriptVariables = globalVariables)
+                        }
+                        if (personaName != null) {
+                            val persona = nextSettings.personas.firstOrNull {
+                                it.name.equals(personaName, ignoreCase = true)
+                            }
+                            if (persona == null) {
+                                toaster.show(
+                                    message = context.getString(R.string.quick_messages_persona_missing, personaName),
+                                    type = ToastType.Warning,
+                                )
+                            } else if (nextSettings.selectedPersonaId != persona.id) {
+                                nextSettings = nextSettings.copy(selectedPersonaId = persona.id)
+                            }
+                        }
+                        if (nextSettings != setting) {
+                            vm.updateSettings(nextSettings)
                         }
                     },
                     onApplyQuickMessageChatMessages = { messages, triggerGeneration, localVariables ->
